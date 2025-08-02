@@ -31,7 +31,7 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
   const handleNewSession = () => {
     const newSession: ChatSession = {
       id: crypto.randomUUID(),
-      name: 'New Chat',
+      name: 'Nova Conversa',
       messages: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -114,12 +114,12 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
               </svg>
             </button>
             <h1 className="text-xl font-semibold">
-              {currentSession?.name || 'AI Assistant'}
+              {currentSession?.name || 'Assistent d\'IA'}
             </h1>
           </div>
           {currentSession && (
             <span className="text-sm text-gray-600">
-              {currentSession.messages.length} messages
+              {currentSession.messages.length} missatges
             </span>
           )}
         </div>
@@ -147,15 +147,15 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                 </div>
-                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Welcome to AI Assistant</h2>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Benvingut a l'Assistent d'IA</h2>
                 <p className="text-gray-600 mb-6">
-                  Start a new conversation to begin chatting with the AI agent.
+                  Inicia una nova conversa per començar a parlar amb l'agent d'IA.
                 </p>
                 <button 
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   onClick={handleNewSession}
                 >
-                  Start New Chat
+                  Iniciar Nova Conversa
                 </button>
               </div>
             </div>

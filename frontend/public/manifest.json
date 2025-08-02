@@ -1,6 +1,6 @@
 {
-  "short_name": "Chat Agent",
-  "name": "Chat Agent - AI Assistant with Tools",
+  "short_name": "Agent de Conversa",
+  "name": "Agent de Conversa - Assistent d'IA amb Eines",
   "icons": [
     {
       "src": "favicon.ico",

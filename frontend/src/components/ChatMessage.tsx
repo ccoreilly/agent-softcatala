@@ -43,7 +43,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       <div className="message-content">
         <div className="message-header">
           <span className="message-role">
-            {message.role === 'user' ? 'You' : 'Assistant'}
+            {message.role === 'user' ? 'Tu' : 'Assistent'}
           </span>
           <span className="message-timestamp">
             {formatDistanceToNow(new Date(message.timestamp), { addSuffix: true })}
