@@ -258,18 +258,18 @@ class TelegramBot:
                     # Add assistant response to history
                     self.message_history.add_message(chat_id, "assistant", full_response)
                 else:
-                    await thinking_msg.edit_text("🤖 I'm sorry, I couldn't generate a response.")
+                    await thinking_msg.edit_text("🤖 Ho sento, no he pogut generar una resposta.")
                 
             except Exception as e:
                 logger.error(f"Error during agent streaming: {e}")
                 await thinking_msg.edit_text(
-                    f"❌ Sorry, I encountered an error: {str(e)}"
+                    f"❌ Ho sento, he trobat un error: {str(e)}"
                 )
         
         except Exception as e:
             logger.error(f"Error handling message from {chat_id}: {e}")
             await update.message.reply_text(
-                "❌ Sorry, I encountered an error processing your message. Please try again."
+                "❌ Ho sento, he trobat un error processant el teu missatge. Si us plau, torna-ho a intentar."
             )
         
         finally:

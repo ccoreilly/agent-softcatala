@@ -82,8 +82,8 @@ class ModelInfo(BaseModel):
 @app.get("/")
 async def root():
     return {
-        "message": "LangChain Chat Agent API",
-        "status": "running",
+        "message": "API de l'Agent de Conversa LangChain",
+        "status": "funcionant",
         "version": "2.0.0",
         "features": ["ollama", "zhipu_ai", "langchain", "tools", "telegram_bot"]
     }
@@ -95,7 +95,7 @@ async def health():
         health_status = await agent.check_health()
         return health_status
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Servei no saludable: {str(e)}")
 
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
@@ -152,7 +152,7 @@ async def get_available_models():
             providers.append(ModelInfo(
                 provider=provider_name,
                 models=model_list,
-                status="available" if model_list else "unavailable"
+                status="disponible" if model_list else "no disponible"
             ))
         
         return {"providers": providers}
@@ -170,7 +170,7 @@ async def switch_model(request: Dict[str, Any]):
         if not provider or not model_name:
             raise HTTPException(
                 status_code=400,
-                detail="Both 'provider' and 'model' are required"
+                detail="Tant 'provider' com 'model' són necessaris"
             )
         
         # Extract model parameters
@@ -182,7 +182,7 @@ async def switch_model(request: Dict[str, Any]):
         agent.switch_model(provider, model_name, **model_kwargs)
         
         return {
-            "message": f"Successfully switched to {model_name} from {provider}",
+            "message": f"Canviat correctament a {model_name} de {provider}",
             "provider": provider,
             "model": model_name,
             "parameters": model_kwargs
@@ -202,7 +202,7 @@ async def get_available_tools():
         return {
             "count": tools_info.get("count", 0),
             "tools": tools_info.get("names", []),
-            "status": "available"
+            "status": "disponible"
         }
     except Exception as e:
         logger.error(f"Error getting tools: {e}")
