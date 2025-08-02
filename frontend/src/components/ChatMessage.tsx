@@ -25,7 +25,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     }
 
     // For assistant messages, render as markdown
-    const htmlContent = marked(message.content);
+    const htmlContent = marked.parse(message.content, { async: false }) as string;
     
     return (
       <div 
