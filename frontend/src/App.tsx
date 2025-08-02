@@ -1,282 +1,181 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
+import { AssistantRuntimeProvider, useLocalRuntime, Thread, Composer } from '@assistant-ui/react';
+import { chatAgentAdapter } from './lib/transport';
 import { ChatSession } from './types';
-import { ChatMessage, streamChatResponse } from './lib/transport';
 import { storage } from './utils/storage';
 import { Sidebar } from './components/Sidebar';
 import { cn } from './lib/utils';
-import { Send, StopCircle } from 'lucide-react';
+import '@assistant-ui/react/styles/index.css';
 import './App.css';
 
-// Simple message component
-const MessageBubble: React.FC<{ message: ChatMessage; isStreaming?: boolean }> = ({ 
-  message, 
-  isStreaming 
-}) => {
-  return (
-    <div className={cn(
-      "flex w-full",
-      message.role === 'user' ? 'justify-end' : 'justify-start'
-    )}>
-      <div className={cn(
-        "max-w-[80%] rounded-lg px-4 py-2 mb-4",
-        message.role === 'user' 
-          ? 'bg-blue-600 text-white ml-12' 
-          : 'bg-gray-100 text-gray-900 mr-12'
-      )}>
-        <div className="prose prose-sm max-w-none dark:prose-invert">
-          {message.content}
-          {isStreaming && <span className="animate-pulse">|</span>}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Simple composer component
-const MessageComposer: React.FC<{
-  onSend: (message: string) => void;
-  disabled?: boolean;
-  placeholder?: string;
-}> = ({ onSend, disabled, placeholder = "Type your message..." }) => {
-  const [input, setInput] = useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (input.trim() && !disabled) {
-      onSend(input.trim());
-      setInput('');
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
-      <textarea
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        disabled={disabled}
-        className="flex-1 min-h-[60px] max-h-[200px] resize-none border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-        rows={2}
-      />
-      <button
-        type="submit"
-        disabled={!input.trim() || disabled}
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-      >
-        <Send size={16} />
-        Send
-      </button>
-    </form>
-  );
-};
-
-function App() {
+function ChatInterface() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [streamingMessage, setStreamingMessage] = useState<ChatMessage | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Create the assistant runtime with our custom adapter
+  const runtime = useLocalRuntime(chatAgentAdapter);
 
-  // Load sessions from localStorage on mount
+  // Load sessions from storage
   useEffect(() => {
-    const savedSessions = storage.getSessions();
-    setSessions(savedSessions);
+    const loadedSessions = storage.getSessions();
+    setSessions(loadedSessions);
     
-    const savedCurrentSession = storage.getCurrentSessionId();
-    if (savedCurrentSession && savedSessions.find(s => s.id === savedCurrentSession)) {
-      setCurrentSessionId(savedCurrentSession);
+    if (loadedSessions.length > 0 && !currentSessionId) {
+      setCurrentSessionId(loadedSessions[0].id);
     }
-  }, []);
+  }, [currentSessionId]);
 
-  // Auto-scroll to bottom when messages change
+  // Save sessions to storage whenever they change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [currentSession?.messages, streamingMessage]);
-
-  const currentSession = sessions.find(s => s.id === currentSessionId);
+    storage.saveSessions(sessions);
+  }, [sessions]);
 
   const handleNewSession = () => {
-    const session = storage.createSession(`Chat ${sessions.length + 1}`);
-    setSessions([session, ...sessions]);
-    setCurrentSessionId(session.id);
-    storage.setCurrentSessionId(session.id);
-  };
+    const newSession: ChatSession = {
+      id: crypto.randomUUID(),
+      title: 'New Chat',
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
 
-  const handleSelectSession = (sessionId: string) => {
-    // Cancel any ongoing requests when switching sessions
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    setCurrentSessionId(sessionId);
-    storage.setCurrentSessionId(sessionId);
-    setStreamingMessage(null);
-    setIsLoading(false);
+    setSessions(prev => [newSession, ...prev]);
+    setCurrentSessionId(newSession.id);
+    
+    // Clear the current conversation in the runtime
+    runtime.switchToNewThread();
   };
 
   const handleDeleteSession = (sessionId: string) => {
-    storage.deleteSession(sessionId);
-    const updatedSessions = sessions.filter(s => s.id !== sessionId);
-    setSessions(updatedSessions);
+    setSessions(prev => prev.filter(s => s.id !== sessionId));
     
     if (currentSessionId === sessionId) {
-      const nextSession = updatedSessions[0];
-      if (nextSession) {
-        setCurrentSessionId(nextSession.id);
-        storage.setCurrentSessionId(nextSession.id);
+      const remainingSessions = sessions.filter(s => s.id !== sessionId);
+      if (remainingSessions.length > 0) {
+        setCurrentSessionId(remainingSessions[0].id);
       } else {
         setCurrentSessionId(null);
-        storage.setCurrentSessionId(null);
+        runtime.switchToNewThread();
       }
     }
   };
 
-  const handleRenameSession = (sessionId: string, newName: string) => {
-    storage.updateSession(sessionId, { name: newName });
-    setSessions(sessions.map(s => 
-      s.id === sessionId ? { ...s, name: newName } : s
-    ));
+  const handleSessionSelect = (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    // Note: In a full implementation, you'd want to restore the conversation history
+    // This would require additional assistant-ui API calls
+    runtime.switchToNewThread();
   };
 
-  const handleSendMessage = async (content: string) => {
-    if (isLoading) return;
-
-    // Create session if none exists
-    let sessionId = currentSessionId;
-    if (!sessionId) {
-      const newSession = storage.createSession('New Chat');
-      setSessions([newSession, ...sessions]);
-      setCurrentSessionId(newSession.id);
-      storage.setCurrentSessionId(newSession.id);
-      sessionId = newSession.id;
-    }
-
-    // Create user message
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content,
-      timestamp: new Date().toISOString(),
-    };
-
-    // Add user message to storage and state
-    storage.addMessage(sessionId, userMessage);
-    setSessions(prev => prev.map(s => 
-      s.id === sessionId 
-        ? { ...s, messages: [...s.messages, userMessage] }
-        : s
-    ));
-
-    // Prepare streaming assistant message
-    const assistantMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: '',
-      timestamp: new Date().toISOString(),
-    };
-
-    setStreamingMessage(assistantMessage);
-    setIsLoading(true);
-
-    // Cancel any existing request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    try {
-      // Get all messages for context
-      const session = storage.getSession(sessionId);
-      if (!session) return;
-
-      const allMessages = [...session.messages, userMessage];
-
-      // Convert to the format expected by streamChatResponse
-      const coreMessages = allMessages.map(msg => ({
-        role: msg.role as 'user' | 'assistant' | 'system',
-        content: msg.content,
-      }));
-
-      await streamChatResponse(
-        coreMessages,
-        (content) => {
-          setStreamingMessage(prev => prev ? { ...prev, content } : null);
-        },
-        abortControllerRef.current.signal
-      );
-
-      // Finalize the assistant message
-      if (streamingMessage) {
-        const finalMessage = { ...assistantMessage, content: streamingMessage.content };
-        storage.addMessage(sessionId, finalMessage);
-        setSessions(prev => prev.map(s => 
-          s.id === sessionId 
-            ? { ...s, messages: [...s.messages, finalMessage] }
-            : s
-        ));
-      }
-
-    } catch (error: any) {
-      if (error.name !== 'AbortError') {
-        console.error('Error sending message:', error);
-      }
-    } finally {
-      setStreamingMessage(null);
-      setIsLoading(false);
-      abortControllerRef.current = null;
-    }
-  };
-
-  const handleStopGeneration = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setIsLoading(false);
-      setStreamingMessage(null);
-    }
-  };
+  const currentSession = sessions.find(s => s.id === currentSessionId);
 
   return (
-    <div className="app">
-      <Sidebar
-        sessions={sessions}
-        currentSessionId={currentSessionId}
-        onSelectSession={handleSelectSession}
-        onNewSession={handleNewSession}
-        onDeleteSession={handleDeleteSession}
-        onRenameSession={handleRenameSession}
-        isCollapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
+    <div className={cn("h-screen flex bg-white text-gray-900")}>
+      {/* Sidebar */}
+      <div className={cn(
+        "transition-all duration-300 border-r border-gray-200 bg-gray-50",
+        sidebarCollapsed ? "w-0" : "w-64"
+      )}>
+        {!sidebarCollapsed && (
+          <Sidebar
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            onNewSession={handleNewSession}
+            onSessionSelect={handleSessionSelect}
+            onDeleteSession={handleDeleteSession}
+          />
+        )}
+      </div>
 
-      <div className="main-content">
-        <div className="chat-header">
-          <h1 className="text-2xl font-bold">Chat Agent</h1>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <div className="border-b border-gray-200 p-4 bg-white flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h1 className="text-xl font-semibold">
+              {currentSession?.title || 'AI Assistant'}
+            </h1>
+          </div>
           {currentSession && (
-            <div className="flex items-center gap-4">
-              <span className="text-lg font-medium">{currentSession.name}</span>
-                               <span className="text-sm text-gray-600">
-                   {currentSession.messages.length} messages
-                 </span>
-            </div>
+            <span className="text-sm text-gray-600">
+              {currentSession.messages.length} messages
+            </span>
           )}
         </div>
 
-        <div className="flex-1 flex flex-col">
-          {!currentSession ? (
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col min-h-0">
+          {currentSession ? (
+            <>
+              {/* Thread Component from assistant-ui */}
+              <div className="flex-1 overflow-hidden">
+                <Thread
+                  assistantMessage={{ 
+                    components: { 
+                      Text: ({ children }) => (
+                        <div className="prose prose-sm max-w-none text-gray-900">
+                          {children}
+                        </div>
+                      )
+                    } 
+                  }}
+                  userMessage={{
+                    components: {
+                      Text: ({ children }) => (
+                        <div className="text-white">
+                          {children}
+                        </div>
+                      )
+                    }
+                  }}
+                  className="h-full"
+                />
+              </div>
+
+              {/* Composer Component from assistant-ui */}
+              <div className="border-t border-gray-200 p-4 bg-white">
+                <Composer
+                  placeholder="Type your message here..."
+                  className="w-full"
+                  onComposerSend={() => {
+                    // Update session title if it's a new session
+                    if (currentSession.messages.length === 0) {
+                      const firstMessage = runtime.thread.getState().messages[0];
+                      if (firstMessage && typeof firstMessage.content === 'string') {
+                        const newTitle = firstMessage.content.slice(0, 50) + 
+                          (firstMessage.content.length > 50 ? '...' : '');
+                        
+                        setSessions(prev => prev.map(s => 
+                          s.id === currentSessionId 
+                            ? { ...s, title: newTitle, updatedAt: new Date().toISOString() }
+                            : s
+                        ));
+                      }
+                    }
+                  }}
+                />
+              </div>
+            </>
+          ) : (
+            /* Empty State */
             <div className="flex-1 flex items-center justify-center">
-              <div className="text-center space-y-4">
-                <h2 className="text-3xl font-bold">Welcome to Chat Agent</h2>
-                <p className="text-gray-600">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">Welcome to AI Assistant</h2>
+                <p className="text-gray-600 mb-6">
                   Start a new conversation to begin chatting with the AI agent.
                 </p>
                 <button 
@@ -287,50 +186,18 @@ function App() {
                 </button>
               </div>
             </div>
-          ) : (
-            <>
-              <div className="flex-1 overflow-y-auto p-4">
-                                 {currentSession.messages.length === 0 && (
-                   <div className="text-center text-gray-600 py-8">
-                     <p>Hello! I'm your AI assistant. How can I help you today?</p>
-                   </div>
-                 )}
-                
-                {currentSession.messages.map((message) => (
-                  <MessageBubble key={message.id} message={message} />
-                ))}
-
-                {streamingMessage && (
-                  <MessageBubble message={streamingMessage} isStreaming={true} />
-                )}
-
-                <div ref={messagesEndRef} />
-              </div>
-              
-              <div className="border-t p-4">
-                <MessageComposer
-                  onSend={handleSendMessage}
-                  disabled={isLoading}
-                  placeholder={isLoading ? "AI is thinking..." : "Type your message..."}
-                />
-                
-                {isLoading && (
-                  <div className="flex justify-center mt-2">
-                                         <button
-                       onClick={handleStopGeneration}
-                       className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center gap-1"
-                     >
-                       <StopCircle size={14} />
-                       Stop Generation
-                     </button>
-                  </div>
-                )}
-              </div>
-            </>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AssistantRuntimeProvider>
+      <ChatInterface />
+    </AssistantRuntimeProvider>
   );
 }
 
