@@ -1,0 +1,176 @@
+.sidebar {
+  width: 320px;
+  background-color: #16213e;
+  border-right: 1px solid #2a3441;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s ease;
+  min-height: 100vh;
+}
+
+.sidebar.collapsed {
+  width: 60px;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid #2a3441;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle-button {
+  background: #2a3441;
+  border: none;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggle-button:hover {
+  background: #3b4756;
+}
+
+.new-chat-button {
+  background: #3b82f6;
+  border: none;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  flex: 1;
+}
+
+.new-chat-button:hover {
+  background: #2563eb;
+}
+
+.sessions-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #9ca3af;
+}
+
+.empty-state p {
+  margin: 8px 0;
+}
+
+.session-item {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.session-item:hover {
+  background: #334155;
+  border-color: #475569;
+}
+
+.session-item.active {
+  background: #1e40af;
+  border-color: #3b82f6;
+}
+
+.session-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-name {
+  font-weight: 500;
+  color: #ffffff;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.message-count,
+.last-updated {
+  font-size: 11px;
+}
+
+.session-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.session-item:hover .session-actions {
+  opacity: 1;
+}
+
+.action-button {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.action-button:hover {
+  background: #475569;
+  color: #ffffff;
+}
+
+.action-button.delete:hover {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.rename-input {
+  background: #0f172a;
+  border: 1px solid #3b82f6;
+  color: #ffffff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100%;
+}
+
+.rename-input:focus {
+  outline: none;
+  border-color: #60a5fa;
+}
