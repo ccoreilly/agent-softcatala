@@ -1,0 +1,180 @@
+.tool-call-display {
+  background-color: #1e1b4b;
+  border: 1px solid #3730a3;
+  border-radius: 8px;
+  margin: 12px 0;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.tool-call-display.executing {
+  border-color: #f59e0b;
+  background-color: #451a03;
+}
+
+.tool-call-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  background-color: rgba(59, 130, 246, 0.1);
+  transition: background-color 0.2s;
+}
+
+.tool-call-header:hover {
+  background-color: rgba(59, 130, 246, 0.2);
+}
+
+.tool-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-icon {
+  font-size: 18px;
+}
+
+.tool-name {
+  font-weight: 600;
+  color: #ffffff;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', consolas, monospace;
+}
+
+.tool-status {
+  color: #94a3b8;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expand-button {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px;
+  transition: color 0.2s;
+}
+
+.expand-button:hover {
+  color: #ffffff;
+}
+
+.tool-call-details {
+  padding: 16px;
+  border-top: 1px solid #3730a3;
+}
+
+.parameters-section,
+.result-section,
+.error-section {
+  margin-bottom: 16px;
+}
+
+.parameters-section h4,
+.result-section h4,
+.error-section h4 {
+  color: #ffffff;
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.json-display {
+  background-color: #0f172a;
+  color: #e5e7eb;
+  padding: 12px;
+  border-radius: 6px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', consolas, monospace;
+  font-size: 12px;
+  overflow-x: auto;
+  border: 1px solid #374151;
+  margin: 0;
+}
+
+.web-result {
+  background-color: #0f172a;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.web-result-header {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #374151;
+}
+
+.web-result-header strong {
+  color: #ffffff;
+  display: block;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.url-link {
+  color: #60a5fa;
+  text-decoration: none;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.url-link:hover {
+  text-decoration: underline;
+}
+
+.web-content {
+  color: #d1d5db;
+  line-height: 1.5;
+  font-size: 13px;
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+}
+
+.extracted-links {
+  border-top: 1px solid #374151;
+  padding-top: 12px;
+}
+
+.extracted-links h5 {
+  color: #ffffff;
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.extracted-links ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.extracted-links li {
+  margin: 4px 0;
+}
+
+.extracted-links a {
+  color: #60a5fa;
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.extracted-links a:hover {
+  text-decoration: underline;
+}
+
+.error-section {
+  background-color: #450a0a;
+  border: 1px solid #dc2626;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.error-message {
+  color: #fca5a5;
+  font-size: 13px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', consolas, monospace;
+}
