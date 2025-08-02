@@ -26,7 +26,7 @@ services:
       - "8000:8000"
     environment:
       - OLLAMA_URL=http://ollama:11434
-      - LLM_MODEL=${LLM_MODEL:-llama2}
+      - LLM_MODEL=${LLM_MODEL:-llama3.2}
       - CORS_ORIGINS=http://localhost:3000,http://localhost:80
     depends_on:
       ollama:
