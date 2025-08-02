@@ -127,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           if (
-                            confirm(
+                            window.confirm(
                               `Are you sure you want to delete "${session.name}"?`
                             )
                           ) {

@@ -8,13 +8,10 @@ import { cn } from './lib/utils';
 import '@assistant-ui/react/styles/index.css';
 import './App.css';
 
-function ChatInterface() {
+function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime> }) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  // Create the assistant runtime with our custom adapter
-  const runtime = useLocalRuntime(chatAgentAdapter);
 
   // Load sessions from storage
   useEffect(() => {
@@ -34,7 +31,7 @@ function ChatInterface() {
   const handleNewSession = () => {
     const newSession: ChatSession = {
       id: crypto.randomUUID(),
-      title: 'New Chat',
+      name: 'New Chat',
       messages: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -68,6 +65,18 @@ function ChatInterface() {
     runtime.switchToNewThread();
   };
 
+  const handleRenameSession = (sessionId: string, newName: string) => {
+    setSessions(prev => prev.map(session => 
+      session.id === sessionId 
+        ? { ...session, name: newName, updatedAt: new Date().toISOString() }
+        : session
+    ));
+  };
+
+  const handleToggleCollapse = () => {
+    setSidebarCollapsed(prev => !prev);
+  };
+
   const currentSession = sessions.find(s => s.id === currentSessionId);
 
   return (
@@ -82,8 +91,11 @@ function ChatInterface() {
             sessions={sessions}
             currentSessionId={currentSessionId}
             onNewSession={handleNewSession}
-            onSessionSelect={handleSessionSelect}
+            onSelectSession={handleSessionSelect}
             onDeleteSession={handleDeleteSession}
+            onRenameSession={handleRenameSession}
+            isCollapsed={sidebarCollapsed}
+            onToggleCollapse={handleToggleCollapse}
           />
         )}
       </div>
@@ -102,7 +114,7 @@ function ChatInterface() {
               </svg>
             </button>
             <h1 className="text-xl font-semibold">
-              {currentSession?.title || 'AI Assistant'}
+              {currentSession?.name || 'AI Assistant'}
             </h1>
           </div>
           {currentSession && (
@@ -117,52 +129,13 @@ function ChatInterface() {
           {currentSession ? (
             <>
               {/* Thread Component from assistant-ui */}
-              <div className="flex-1 overflow-hidden">
-                <Thread
-                  assistantMessage={{ 
-                    components: { 
-                      Text: ({ children }) => (
-                        <div className="prose prose-sm max-w-none text-gray-900">
-                          {children}
-                        </div>
-                      )
-                    } 
-                  }}
-                  userMessage={{
-                    components: {
-                      Text: ({ children }) => (
-                        <div className="text-white">
-                          {children}
-                        </div>
-                      )
-                    }
-                  }}
-                  className="h-full"
-                />
+              <div className="flex-1 overflow-hidden h-full">
+                <Thread />
               </div>
 
               {/* Composer Component from assistant-ui */}
               <div className="border-t border-gray-200 p-4 bg-white">
-                <Composer
-                  placeholder="Type your message here..."
-                  className="w-full"
-                  onComposerSend={() => {
-                    // Update session title if it's a new session
-                    if (currentSession.messages.length === 0) {
-                      const firstMessage = runtime.thread.getState().messages[0];
-                      if (firstMessage && typeof firstMessage.content === 'string') {
-                        const newTitle = firstMessage.content.slice(0, 50) + 
-                          (firstMessage.content.length > 50 ? '...' : '');
-                        
-                        setSessions(prev => prev.map(s => 
-                          s.id === currentSessionId 
-                            ? { ...s, title: newTitle, updatedAt: new Date().toISOString() }
-                            : s
-                        ));
-                      }
-                    }
-                  }}
-                />
+                <Composer />
               </div>
             </>
           ) : (
@@ -194,9 +167,12 @@ function ChatInterface() {
 }
 
 function App() {
+  // Create the assistant runtime with our custom adapter
+  const runtime = useLocalRuntime(chatAgentAdapter);
+  
   return (
-    <AssistantRuntimeProvider>
-      <ChatInterface />
+    <AssistantRuntimeProvider runtime={runtime}>
+      <ChatInterface runtime={runtime} />
     </AssistantRuntimeProvider>
   );
 }
