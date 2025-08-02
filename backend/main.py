@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 import json
 import os
 import logging
+import asyncio
 from dotenv import load_dotenv
 
 from langchain_agent import LangChainAgent
@@ -84,7 +85,7 @@ async def root():
         "message": "LangChain Chat Agent API",
         "status": "running",
         "version": "2.0.0",
-        "features": ["ollama", "zhipu_ai", "langchain", "tools"]
+        "features": ["ollama", "zhipu_ai", "langchain", "tools", "telegram_bot"]
     }
 
 @app.get("/health")
@@ -229,11 +230,85 @@ async def get_providers():
         logger.error(f"Error getting providers: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+async def start_telegram_bot():
+    """Start the Telegram bot if configured."""
+    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    
+    if not telegram_token:
+        logger.info("TELEGRAM_BOT_TOKEN not found, skipping Telegram bot startup")
+        return
+    
+    try:
+        from telegram_bot import TelegramBot
+        
+        # Get max user messages from environment (default 20)
+        max_user_messages = int(os.getenv("TELEGRAM_MAX_USER_MESSAGES", "20"))
+        
+        telegram_bot = TelegramBot(telegram_token, agent, max_user_messages)
+        await telegram_bot.start_bot()
+        
+    except ImportError:
+        logger.error("python-telegram-bot not installed. Install with: pip install python-telegram-bot==21.0.1")
+    except Exception as e:
+        logger.error(f"Error starting Telegram bot: {e}")
+
+
+async def start_services():
+    """Start both HTTP server and Telegram bot."""
+    # Check if we should run Telegram bot
+    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    
+    if telegram_token:
+        logger.info("Starting both HTTP endpoint and Telegram bot...")
+        
+        # Start Telegram bot in background
+        telegram_task = asyncio.create_task(start_telegram_bot())
+        
+        # Import uvicorn and start HTTP server
+        import uvicorn
+        config = uvicorn.Config(
+            app,
+            host="0.0.0.0",
+            port=8000,
+            log_level="info"
+        )
+        server = uvicorn.Server(config)
+        
+        # Start HTTP server in background
+        http_task = asyncio.create_task(server.serve())
+        
+        # Wait for both services
+        try:
+            await asyncio.gather(telegram_task, http_task)
+        except KeyboardInterrupt:
+            logger.info("Shutting down services...")
+        except Exception as e:
+            logger.error(f"Error running services: {e}")
+    else:
+        logger.info("Starting HTTP endpoint only (no Telegram token provided)...")
+        import uvicorn
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=8000,
+            log_level="info"
+        )
+
+
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        log_level="info"
-    )
+    # Check if we need to run with asyncio (for Telegram bot)
+    telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    
+    if telegram_token:
+        # Run with asyncio to support Telegram bot
+        asyncio.run(start_services())
+    else:
+        # Run only HTTP server
+        import uvicorn
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=8000,
+            log_level="info"
+        )
