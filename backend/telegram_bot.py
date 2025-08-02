@@ -62,22 +62,22 @@ class TelegramBot:
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /start command."""
         chat_id = str(update.effective_chat.id)
-        user_name = update.effective_user.first_name or "there"
+        user_name = update.effective_user.first_name or "amic"
         
         welcome_message = (
-            f"🤖 Hello {user_name}! Welcome to the LangChain AI Assistant.\n\n"
-            "I can help you with various tasks using advanced AI capabilities including:\n"
-            "• Web search and browsing\n"
-            "• Wikipedia lookups\n"
-            "• General question answering\n"
-            "• Code assistance\n"
-            "• And much more!\n\n"
-            "Commands:\n"
-            "/help - Show this help message\n"
-            "/clear - Clear conversation history\n"
-            "/history - Show conversation statistics\n"
-            "/status - Check bot and AI status\n\n"
-            "Just send me a message and I'll do my best to help! 🚀"
+            f"🤖 Hola {user_name}! Benvingut a l'Agent de Softcatalà.\n\n"
+            "Puc ajudar-te amb diverses tasques utilitzant capacitats d'IA avançades incloent:\n"
+            "• Cerca web i navegació\n"
+            "• Consultes a Wikipedia\n"
+            "• Respostes a preguntes generals\n"
+            "• Assistència amb codi\n"
+            "• I molt més!\n\n"
+            "Ordres:\n"
+            "/help - Mostra aquest missatge d'ajuda\n"
+            "/clear - Esborra l'historial de conversa\n"
+            "/history - Mostra estadístiques de conversa\n"
+            "/status - Comprova l'estat del bot i l'IA\n\n"
+            "Simplement envia'm un missatge i l'Agent de Softcatalà farà el seu millor per ajudar-te! 🚀"
         )
         
         await update.message.reply_text(welcome_message, parse_mode=ParseMode.MARKDOWN)
@@ -86,22 +86,22 @@ class TelegramBot:
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /help command."""
         help_message = (
-            "🤖 *LangChain AI Assistant Help*\n\n"
-            "*Available Commands:*\n"
-            "/start - Start the bot and see welcome message\n"
-            "/help - Show this help message\n"
-            "/clear - Clear your conversation history\n"
-            "/history - Show conversation statistics\n"
-            "/status - Check bot and AI model status\n\n"
-            "*How to use:*\n"
-            "Simply send me any message and I'll respond using advanced AI capabilities.\n"
-            "I can browse the web, search Wikipedia, answer questions, help with code, and more!\n\n"
-            "*Features:*\n"
-            "• Maintains conversation context (up to 20 of your messages)\n"
-            "• Web browsing and search capabilities\n"
-            "• Multiple AI model support\n"
-            "• Tool integration for enhanced responses\n\n"
-            "Feel free to ask me anything! 💬"
+            "🤖 *Ajuda de l'Agent de Softcatalà*\n\n"
+            "*Ordres Disponibles:*\n"
+            "/start - Inicia el bot i mostra el missatge de benvinguda\n"
+            "/help - Mostra aquest missatge d'ajuda\n"
+            "/clear - Esborra el teu historial de conversa\n"
+            "/history - Mostra estadístiques de conversa\n"
+            "/status - Comprova l'estat del bot i el model d'IA\n\n"
+            "*Com utilitzar-lo:*\n"
+            "Simplement envia qualsevol missatge i l'Agent de Softcatalà respondrà utilitzant capacitats d'IA avançades.\n"
+            "L'Agent pot navegar per la web, cercar a Wikipedia, respondre preguntes, ajudar amb codi, i més!\n\n"
+            "*Funcionalitats:*\n"
+            "• Manté el context de conversa (fins a 20 dels teus missatges)\n"
+            "• Capacitats de navegació web i cerca\n"
+            "• Suport per múltiples models d'IA\n"
+            "• Integració d'eines per respostes millorades\n\n"
+            "No dubtis a preguntar-me qualsevol cosa! 💬"
         )
         
         await update.message.reply_text(help_message, parse_mode=ParseMode.MARKDOWN)
@@ -113,7 +113,7 @@ class TelegramBot:
         self.message_history.clear_history(chat_id)
         
         await update.message.reply_text(
-            "🗑️ Conversation history cleared! Starting fresh.",
+            "🗑️ Historial de conversa esborrat! Començant de nou.",
             parse_mode=ParseMode.MARKDOWN
         )
         logger.info(f"Cleared history for chat {chat_id}")
@@ -126,11 +126,11 @@ class TelegramBot:
         total_messages = self.message_history.get_total_message_count(chat_id)
         
         history_message = (
-            f"📊 *Conversation Statistics*\n\n"
-            f"👤 Your messages: {user_messages}\n"
-            f"🤖 Total messages: {total_messages}\n"
-            f"📝 Max user messages stored: {self.message_history.max_user_messages}\n\n"
-            f"Use /clear to reset the conversation history."
+            f"📊 *Estadístiques de Conversa*\n\n"
+            f"👤 Els teus missatges: {user_messages}\n"
+            f"🤖 Missatges totals: {total_messages}\n"
+            f"📝 Màxim de missatges d'usuari emmagatzemats: {self.message_history.max_user_messages}\n\n"
+            f"Utilitza /clear per restablir l'historial de conversa."
         )
         
         await update.message.reply_text(history_message, parse_mode=ParseMode.MARKDOWN)
@@ -144,28 +144,34 @@ class TelegramBot:
             models_info = health_status.get("models", {})
             tools_info = health_status.get("tools", {})
             
-            status_message = "🔍 *Bot Status*\n\n"
+            status_message = "🔍 *Estat del Bot*\n\n"
             
             # Model status
-            status_message += "🧠 *AI Models:*\n"
+            status_message += "🧠 *Models d'IA:*\n"
             for provider, info in models_info.items():
                 if isinstance(info, dict):
                     status = info.get("status", "unknown")
+                    if status == "available":
+                        status_ca = "disponible"
+                    elif status == "unavailable":
+                        status_ca = "no disponible"
+                    else:
+                        status_ca = "desconegut"
                     emoji = "✅" if status == "available" else "❌"
-                    status_message += f"{emoji} {provider}: {status}\n"
+                    status_message += f"{emoji} {provider}: {status_ca}\n"
             
             # Tools status
-            status_message += f"\n🛠️ *Tools Available:* {tools_info.get('count', 0)}\n"
+            status_message += f"\n🛠️ *Eines Disponibles:* {tools_info.get('count', 0)}\n"
             for tool_name in tools_info.get('names', []):
                 status_message += f"• {tool_name}\n"
             
             # Bot info
-            status_message += f"\n🤖 *Bot Info:*\n"
-            status_message += f"• Active chats: {len(self.message_history.get_chat_ids())}\n"
-            status_message += f"• Bot running: ✅\n"
+            status_message += f"\n🤖 *Informació del Bot:*\n"
+            status_message += f"• Xats actius: {len(self.message_history.get_chat_ids())}\n"
+            status_message += f"• Bot funcionant: ✅\n"
             
         except Exception as e:
-            status_message = f"❌ *Error checking status:*\n{str(e)}"
+            status_message = f"❌ *Error comprovant l'estat:*\n{str(e)}"
             logger.error(f"Error in status command: {e}")
         
         await update.message.reply_text(status_message, parse_mode=ParseMode.MARKDOWN)
@@ -178,7 +184,7 @@ class TelegramBot:
         # Check if we're already processing a message for this chat
         if self.active_chats.get(chat_id, False):
             await update.message.reply_text(
-                "⏳ Please wait, I'm still processing your previous message..."
+                "⏳ Si us plau espera, encara estic processant el teu missatge anterior..."
             )
             return
         
@@ -200,7 +206,7 @@ class TelegramBot:
             full_response = ""
             
             # Send initial "thinking" message
-            thinking_msg = await update.message.reply_text("🤔 Thinking...")
+            thinking_msg = await update.message.reply_text("🤔 Pensant...")
             
             try:
                 async for chunk in self.agent.chat_stream(history, chat_id):
@@ -228,13 +234,13 @@ class TelegramBot:
                     
                     elif chunk_type == "tool_call":
                         tool_name = chunk.get("tool", "unknown")
-                        await thinking_msg.edit_text(f"🔧 Using tool: {tool_name}...")
+                        await thinking_msg.edit_text(f"🔧 Utilitzant eina: {tool_name}...")
                     
                     elif chunk_type == "tool_result":
-                        await thinking_msg.edit_text("🤔 Processing tool results...")
+                        await thinking_msg.edit_text("🤔 Processant resultats d'eines...")
                     
                     elif chunk_type == "error":
-                        error_msg = chunk.get("error", "Unknown error")
+                        error_msg = chunk.get("error", "Error desconegut")
                         await thinking_msg.edit_text(f"❌ Error: {error_msg}")
                         return
                 
@@ -252,18 +258,18 @@ class TelegramBot:
                     # Add assistant response to history
                     self.message_history.add_message(chat_id, "assistant", full_response)
                 else:
-                    await thinking_msg.edit_text("🤖 I'm sorry, I couldn't generate a response.")
+                    await thinking_msg.edit_text("🤖 Ho sento, no he pogut generar una resposta.")
                 
             except Exception as e:
                 logger.error(f"Error during agent streaming: {e}")
                 await thinking_msg.edit_text(
-                    f"❌ Sorry, I encountered an error: {str(e)}"
+                    f"❌ Ho sento, he trobat un error: {str(e)}"
                 )
         
         except Exception as e:
             logger.error(f"Error handling message from {chat_id}: {e}")
             await update.message.reply_text(
-                "❌ Sorry, I encountered an error processing your message. Please try again."
+                "❌ Ho sento, he trobat un error processant el teu missatge. Si us plau, torna-ho a intentar."
             )
         
         finally:

@@ -34,10 +34,10 @@ export const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({
   };
 
   const getStatusText = () => {
-    if (isExecuting) return 'Executing...';
+    if (isExecuting) return 'Executant...';
     if (toolCall.error) return 'Error';
-    if (toolCall.result) return 'Completed';
-    return 'Pending';
+    if (toolCall.result) return 'Completat';
+    return 'Pendent';
   };
 
   return (
@@ -58,7 +58,7 @@ export const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({
       {isExpanded && (
         <div className="tool-call-details">
           <div className="parameters-section">
-            <h4>Parameters:</h4>
+            <h4>Paràmetres:</h4>
             <pre className="json-display">
               {formatJson(toolCall.parameters)}
             </pre>
@@ -66,7 +66,7 @@ export const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({
 
           {toolCall.result && (
             <div className="result-section">
-              <h4>Result:</h4>
+              <h4>Resultat:</h4>
               {toolCall.tool === 'web_browser' && toolCall.result.status === 'success' ? (
                 <div className="web-result">
                   <div className="web-result-header">
@@ -86,7 +86,7 @@ export const ToolCallDisplay: React.FC<ToolCallDisplayProps> = ({
                   </div>
                   {toolCall.result.links && toolCall.result.links.length > 0 && (
                     <div className="extracted-links">
-                      <h5>Extracted Links:</h5>
+                      <h5>Enllaços Extrets:</h5>
                       <ul>
                         {toolCall.result.links.slice(0, 5).map((link: any, index: number) => (
                           <li key={index}>

@@ -59,13 +59,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           className="toggle-button"
           onClick={onToggleCollapse}
-          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={isCollapsed ? 'Expandir barra lateral' : 'Contraure barra lateral'}
         >
           {isCollapsed ? '→' : '←'}
         </button>
         {!isCollapsed && (
           <button className="new-chat-button" onClick={onNewSession}>
-            + New Chat
+            + Nova Conversa
           </button>
         )}
       </div>
@@ -74,8 +74,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="sessions-list">
           {sessions.length === 0 ? (
             <div className="empty-state">
-              <p>No chat sessions yet</p>
-              <p>Start a new conversation!</p>
+              <p>No hi ha sessions de conversa encara</p>
+              <p>Inicia una nova conversa!</p>
             </div>
           ) : (
             sessions.map((session) => (
@@ -102,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div className="session-name">{session.name}</div>
                       <div className="session-meta">
                         <span className="message-count">
-                          {session.messages.length} messages
+                          {session.messages.length} missatges
                         </span>
                         <span className="last-updated">
                           {formatDistanceToNow(new Date(session.updatedAt), {
@@ -118,7 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           e.stopPropagation();
                           handleRename(session);
                         }}
-                        title="Rename session"
+                        title="Canviar nom de la sessió"
                       >
                         ✏️
                       </button>
@@ -128,13 +128,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           e.stopPropagation();
                           if (
                             window.confirm(
-                              `Are you sure you want to delete "${session.name}"?`
+                              `Estàs segur que vols eliminar "${session.name}"?`
                             )
                           ) {
                             onDeleteSession(session.id);
                           }
                         }}
-                        title="Delete session"
+                        title="Eliminar sessió"
                       >
                         🗑️
                       </button>
