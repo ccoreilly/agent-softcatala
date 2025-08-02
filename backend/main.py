@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-app = FastAPI(title="LangChain Chat Agent API", version="2.0.0")
+app = FastAPI(title="API de l'Agent de Softcatalà", version="2.0.0")
 
 # CORS middleware
 app.add_middleware(
@@ -82,7 +82,7 @@ class ModelInfo(BaseModel):
 @app.get("/")
 async def root():
     return {
-        "message": "API de l'Agent de Conversa LangChain",
+        "message": "API de l'Agent de Softcatalà",
         "status": "funcionant",
         "version": "2.0.0",
         "features": ["ollama", "zhipu_ai", "langchain", "tools", "telegram_bot"]
@@ -99,7 +99,7 @@ async def health():
 
 @app.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
-    """Stream chat responses from the LangChain agent."""
+    """Stream chat responses from the Softcatalà agent."""
     try:
         # Switch model if requested
         if request.provider and request.model:

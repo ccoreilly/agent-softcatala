@@ -65,7 +65,7 @@ class TelegramBot:
         user_name = update.effective_user.first_name or "amic"
         
         welcome_message = (
-            f"🤖 Hola {user_name}! Benvingut a l'Assistent d'IA LangChain.\n\n"
+            f"🤖 Hola {user_name}! Benvingut a l'Agent de Softcatalà.\n\n"
             "Puc ajudar-te amb diverses tasques utilitzant capacitats d'IA avançades incloent:\n"
             "• Cerca web i navegació\n"
             "• Consultes a Wikipedia\n"
@@ -77,7 +77,7 @@ class TelegramBot:
             "/clear - Esborra l'historial de conversa\n"
             "/history - Mostra estadístiques de conversa\n"
             "/status - Comprova l'estat del bot i l'IA\n\n"
-            "Simplement envia'm un missatge i faré el meu millor per ajudar-te! 🚀"
+            "Simplement envia'm un missatge i l'Agent de Softcatalà farà el seu millor per ajudar-te! 🚀"
         )
         
         await update.message.reply_text(welcome_message, parse_mode=ParseMode.MARKDOWN)
@@ -86,7 +86,7 @@ class TelegramBot:
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /help command."""
         help_message = (
-            "🤖 *Ajuda de l'Assistent d'IA LangChain*\n\n"
+            "🤖 *Ajuda de l'Agent de Softcatalà*\n\n"
             "*Ordres Disponibles:*\n"
             "/start - Inicia el bot i mostra el missatge de benvinguda\n"
             "/help - Mostra aquest missatge d'ajuda\n"
@@ -94,8 +94,8 @@ class TelegramBot:
             "/history - Mostra estadístiques de conversa\n"
             "/status - Comprova l'estat del bot i el model d'IA\n\n"
             "*Com utilitzar-lo:*\n"
-            "Simplement envia'm qualsevol missatge i respondré utilitzant capacitats d'IA avançades.\n"
-            "Puc navegar per la web, cercar a Wikipedia, respondre preguntes, ajudar amb codi, i més!\n\n"
+            "Simplement envia qualsevol missatge i l'Agent de Softcatalà respondrà utilitzant capacitats d'IA avançades.\n"
+            "L'Agent pot navegar per la web, cercar a Wikipedia, respondre preguntes, ajudar amb codi, i més!\n\n"
             "*Funcionalitats:*\n"
             "• Manté el context de conversa (fins a 20 dels teus missatges)\n"
             "• Capacitats de navegació web i cerca\n"
