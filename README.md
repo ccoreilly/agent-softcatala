@@ -5,11 +5,12 @@ A modern web-based chat application that allows you to interact with AI agents p
 ## Features
 
 - 🤖 **AI Agent Integration**: Powered by Ollama with configurable open-source models
-- 🛠️ **Tool Support**: Extensible tool system with web browsing capabilities
+- 🛠️ **Native Tool Support**: Uses Ollama's built-in tool calling API for reliable function execution
 - 💬 **Modern Chat UI**: Clean, responsive interface with real-time streaming
 - 📚 **Session Management**: Local storage of chat sessions with full history
 - 🎨 **Markdown Support**: Rich text rendering with syntax highlighting
 - 🌐 **Tool Visualization**: Interactive displays for tool executions and results
+- ⚡ **Streaming Tools**: Real-time tool execution with streaming responses
 - 🐳 **Docker Ready**: Full containerization with Docker Compose
 - 🚀 **Production Ready**: Nginx-served frontend with Traefik labels
 
@@ -19,6 +20,8 @@ A modern web-based chat application that allows you to interact with AI agents p
 
 - Docker and Docker Compose
 - At least 4GB RAM for model execution
+
+> **⚡ New in v2.0**: Native Ollama tool calling support! The agent now uses Ollama's built-in function calling API for more reliable and faster tool execution with streaming support.
 
 ### 1. Clone and Setup
 
@@ -43,12 +46,11 @@ This will start:
 
 ```bash
 # Pull a model (this may take a few minutes)
-docker exec ollama ollama pull llama2
+docker exec ollama ollama pull llama3.2
 
-# Or try other models:
-# docker exec ollama ollama pull codellama
-# docker exec ollama ollama pull mistral
-# docker exec ollama ollama pull neural-chat
+# Or try other models with tool support:
+# docker exec ollama ollama pull llama3.1
+# docker exec ollama ollama pull qwen2.5
 ```
 
 ### 4. Access the Application
@@ -63,7 +65,7 @@ Edit `.env` to configure your setup:
 
 ```bash
 # LLM Model Configuration
-LLM_MODEL=llama2                    # Choose your model
+LLM_MODEL=llama3.2                  # Choose your model
 OLLAMA_URL=http://ollama:11434      # Ollama service URL
 CORS_ORIGINS=http://localhost:3000  # Allowed origins
 
@@ -75,11 +77,14 @@ CORS_ORIGINS=http://localhost:3000  # Allowed origins
 
 Popular models you can use:
 
-- `llama2` - General purpose (3.8GB)
-- `codellama` - Code-focused (3.8GB) 
+- `llama3.1` - Latest model with native tool support (4.7GB) ⭐
+- `llama3.2` - Efficient with tool calling (2.0GB) ⭐
+- `qwen2.5` - Advanced model with excellent tool support (4.4GB) ⭐
 - `mistral` - Fast and efficient (4.1GB)
-- `neural-chat` - Conversation optimized (4.1GB)
+- `codellama` - Code-focused (3.8GB)
 - `llama2:13b` - Larger model for better quality (7.3GB)
+
+⭐ **Recommended for tool usage** - These models have native training for function calling and provide the best experience with tools.
 
 ## Architecture
 
@@ -132,6 +137,8 @@ curl -X POST http://localhost:8000/chat/stream \
   - `url` (required): URL to browse
   - `extract_links` (optional): Extract links from page
   - `max_content_length` (optional): Limit content length
+
+**Note**: Tools are now integrated using Ollama's native tool calling API instead of prompt-based approaches, providing better reliability and streaming support.
 
 ### Adding Custom Tools
 
@@ -233,7 +240,7 @@ services:
 ### Environment Variables for Production
 
 ```bash
-LLM_MODEL=llama2
+LLM_MODEL=llama3.2
 OLLAMA_URL=http://ollama:11434
 CORS_ORIGINS=https://your-domain.com
 TRAEFIK_HOST=your-domain.com
@@ -255,7 +262,7 @@ TRAEFIK_HOST=your-domain.com
 
 3. **Model not found**
    ```bash
-   docker exec ollama ollama pull llama2  # Pull the model
+   docker exec ollama ollama pull llama3.2  # Pull the model
    ```
 
 4. **Out of memory**
