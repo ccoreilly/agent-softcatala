@@ -1,23 +1,92 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChatSession, ChatMessage, StreamChunk, ToolCall } from './types';
+import { ChatSession } from './types';
+import { ChatMessage, streamChatResponse } from './lib/transport';
 import { storage } from './utils/storage';
-import { useChat } from './hooks/useChat';
 import { Sidebar } from './components/Sidebar';
-import { ChatMessage as ChatMessageComponent } from './components/ChatMessage';
-import { ToolCallDisplay } from './components/ToolCallDisplay';
+import { cn } from './lib/utils';
+import { Send, StopCircle } from 'lucide-react';
 import './App.css';
+
+// Simple message component
+const MessageBubble: React.FC<{ message: ChatMessage; isStreaming?: boolean }> = ({ 
+  message, 
+  isStreaming 
+}) => {
+  return (
+    <div className={cn(
+      "flex w-full",
+      message.role === 'user' ? 'justify-end' : 'justify-start'
+    )}>
+      <div className={cn(
+        "max-w-[80%] rounded-lg px-4 py-2 mb-4",
+        message.role === 'user' 
+          ? 'bg-blue-600 text-white ml-12' 
+          : 'bg-gray-100 text-gray-900 mr-12'
+      )}>
+        <div className="prose prose-sm max-w-none dark:prose-invert">
+          {message.content}
+          {isStreaming && <span className="animate-pulse">|</span>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Simple composer component
+const MessageComposer: React.FC<{
+  onSend: (message: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}> = ({ onSend, disabled, placeholder = "Type your message..." }) => {
+  const [input, setInput] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (input.trim() && !disabled) {
+      onSend(input.trim());
+      setInput('');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex gap-2">
+      <textarea
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="flex-1 min-h-[60px] max-h-[200px] resize-none border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+        rows={2}
+      />
+      <button
+        type="submit"
+        disabled={!input.trim() || disabled}
+        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+      >
+        <Send size={16} />
+        Send
+      </button>
+    </form>
+  );
+};
 
 function App() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [input, setInput] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState<ChatMessage | null>(null);
-  const [currentToolCalls, setCurrentToolCalls] = useState<ToolCall[]>([]);
-  const [executingTools, setExecutingTools] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { sendMessage, stopGeneration, isLoading, error } = useChat();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load sessions from localStorage on mount
   useEffect(() => {
@@ -45,12 +114,14 @@ function App() {
   };
 
   const handleSelectSession = (sessionId: string) => {
+    // Cancel any ongoing requests when switching sessions
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     setCurrentSessionId(sessionId);
     storage.setCurrentSessionId(sessionId);
-    // Clear any streaming state when switching sessions
     setStreamingMessage(null);
-    setCurrentToolCalls([]);
-    setExecutingTools(new Set());
+    setIsLoading(false);
   };
 
   const handleDeleteSession = (sessionId: string) => {
@@ -77,8 +148,8 @@ function App() {
     ));
   };
 
-  const handleSendMessage = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSendMessage = async (content: string) => {
+    if (isLoading) return;
 
     // Create session if none exists
     let sessionId = currentSessionId;
@@ -94,25 +165,19 @@ function App() {
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: input.trim(),
+      content,
       timestamp: new Date().toISOString(),
     };
 
-    // Add user message to storage
+    // Add user message to storage and state
     storage.addMessage(sessionId, userMessage);
-    
-    // Update local state
     setSessions(prev => prev.map(s => 
       s.id === sessionId 
         ? { ...s, messages: [...s.messages, userMessage] }
         : s
     ));
 
-    setInput('');
-    setCurrentToolCalls([]);
-    setExecutingTools(new Set());
-
-    // Prepare assistant message
+    // Prepare streaming assistant message
     const assistantMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'assistant',
@@ -121,77 +186,38 @@ function App() {
     };
 
     setStreamingMessage(assistantMessage);
+    setIsLoading(true);
 
-    // Get all messages for context
-    const session = storage.getSession(sessionId);
-    if (!session) return;
-
-    const allMessages = [...session.messages, userMessage];
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
 
     try {
-      await sendMessage(allMessages, sessionId, (chunk: StreamChunk) => {
-        switch (chunk.type) {
-          case 'content':
-            setStreamingMessage(prev => prev ? {
-              ...prev,
-              content: prev.content + (chunk.content || '')
-            } : null);
-            break;
+      // Get all messages for context
+      const session = storage.getSession(sessionId);
+      if (!session) return;
 
-          case 'tool_call':
-            if (chunk.tool && chunk.parameters) {
-              const newToolCall: ToolCall = {
-                tool: chunk.tool,
-                parameters: chunk.parameters,
-              };
-              setCurrentToolCalls(prev => [...prev, newToolCall]);
-              setExecutingTools(prev => new Set([...prev, chunk.tool!]));
-            }
-            break;
+      const allMessages = [...session.messages, userMessage];
 
-          case 'tool_result':
-            if (chunk.tool && chunk.result) {
-              setCurrentToolCalls(prev => 
-                prev.map(tc => 
-                  tc.tool === chunk.tool && !tc.result && !tc.error
-                    ? { ...tc, result: chunk.result }
-                    : tc
-                )
-              );
-              setExecutingTools(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(chunk.tool!);
-                return newSet;
-              });
-            }
-            break;
+      // Convert to the format expected by streamChatResponse
+      const coreMessages = allMessages.map(msg => ({
+        role: msg.role as 'user' | 'assistant' | 'system',
+        content: msg.content,
+      }));
 
-          case 'tool_error':
-            if (chunk.tool && chunk.error) {
-              setCurrentToolCalls(prev => 
-                prev.map(tc => 
-                  tc.tool === chunk.tool && !tc.result && !tc.error
-                    ? { ...tc, error: chunk.error }
-                    : tc
-                )
-              );
-              setExecutingTools(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(chunk.tool!);
-                return newSet;
-              });
-            }
-            break;
-
-          case 'error':
-            console.error('Stream error:', chunk.error);
-            break;
-        }
-      });
+      await streamChatResponse(
+        coreMessages,
+        (content) => {
+          setStreamingMessage(prev => prev ? { ...prev, content } : null);
+        },
+        abortControllerRef.current.signal
+      );
 
       // Finalize the assistant message
       if (streamingMessage) {
-        const finalMessage = { ...streamingMessage };
+        const finalMessage = { ...assistantMessage, content: streamingMessage.content };
         storage.addMessage(sessionId, finalMessage);
         setSessions(prev => prev.map(s => 
           s.id === sessionId 
@@ -200,19 +226,22 @@ function App() {
         ));
       }
 
-    } catch (error) {
-      console.error('Error sending message:', error);
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        console.error('Error sending message:', error);
+      }
     } finally {
       setStreamingMessage(null);
-      setCurrentToolCalls([]);
-      setExecutingTools(new Set());
+      setIsLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+  const handleStopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setIsLoading(false);
+      setStreamingMessage(null);
     }
   };
 
@@ -231,77 +260,74 @@ function App() {
 
       <div className="main-content">
         <div className="chat-header">
-          <h1>Chat Agent</h1>
+          <h1 className="text-2xl font-bold">Chat Agent</h1>
           {currentSession && (
-            <div className="session-info">
-              <span className="session-name">{currentSession.name}</span>
-              <span className="message-count">
-                {currentSession.messages.length} messages
-              </span>
+            <div className="flex items-center gap-4">
+              <span className="text-lg font-medium">{currentSession.name}</span>
+                               <span className="text-sm text-gray-600">
+                   {currentSession.messages.length} messages
+                 </span>
             </div>
           )}
         </div>
 
-        <div className="messages-container">
+        <div className="flex-1 flex flex-col">
           {!currentSession ? (
-            <div className="welcome-screen">
-              <h2>Welcome to Chat Agent</h2>
-              <p>Start a new conversation to begin chatting with the AI agent.</p>
-              <button className="start-chat-button" onClick={handleNewSession}>
-                Start New Chat
-              </button>
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center space-y-4">
+                <h2 className="text-3xl font-bold">Welcome to Chat Agent</h2>
+                <p className="text-gray-600">
+                  Start a new conversation to begin chatting with the AI agent.
+                </p>
+                <button 
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={handleNewSession}
+                >
+                  Start New Chat
+                </button>
+              </div>
             </div>
           ) : (
             <>
-              {currentSession.messages.map((message) => (
-                <ChatMessageComponent key={message.id} message={message} />
-              ))}
+              <div className="flex-1 overflow-y-auto p-4">
+                                 {currentSession.messages.length === 0 && (
+                   <div className="text-center text-gray-600 py-8">
+                     <p>Hello! I'm your AI assistant. How can I help you today?</p>
+                   </div>
+                 )}
+                
+                {currentSession.messages.map((message) => (
+                  <MessageBubble key={message.id} message={message} />
+                ))}
 
-              {currentToolCalls.map((toolCall, index) => (
-                <ToolCallDisplay
-                  key={`${toolCall.tool}-${index}`}
-                  toolCall={toolCall}
-                  isExecuting={executingTools.has(toolCall.tool)}
+                {streamingMessage && (
+                  <MessageBubble message={streamingMessage} isStreaming={true} />
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+              
+              <div className="border-t p-4">
+                <MessageComposer
+                  onSend={handleSendMessage}
+                  disabled={isLoading}
+                  placeholder={isLoading ? "AI is thinking..." : "Type your message..."}
                 />
-              ))}
-
-              {streamingMessage && (
-                <ChatMessageComponent 
-                  message={streamingMessage} 
-                  isStreaming={true}
-                />
-              )}
-
-              <div ref={messagesEndRef} />
+                
+                {isLoading && (
+                  <div className="flex justify-center mt-2">
+                                         <button
+                       onClick={handleStopGeneration}
+                       className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition-colors flex items-center gap-1"
+                     >
+                       <StopCircle size={14} />
+                       Stop Generation
+                     </button>
+                  </div>
+                )}
+              </div>
             </>
           )}
-        </div>
-
-        {error && (
-          <div className="error-banner">
-            <span>⚠️ {error}</span>
-          </div>
-        )}
-
-        <div className="input-container">
-          <div className="input-wrapper">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={currentSession ? "Type your message..." : "Start a new chat to begin"}
-              className="message-input"
-              rows={1}
-              disabled={!currentSession}
-            />
-            <button
-              onClick={isLoading ? stopGeneration : handleSendMessage}
-              disabled={(!input.trim() && !isLoading) || !currentSession}
-              className={`send-button ${isLoading ? 'stop' : 'send'}`}
-            >
-              {isLoading ? '⏹️' : '📤'}
-            </button>
-          </div>
         </div>
       </div>
     </div>
