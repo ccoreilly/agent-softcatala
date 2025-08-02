@@ -2,6 +2,7 @@
   "name": "chat-agent-frontend",
   "version": "1.0.0",
   "description": "Frontend for Chat Agent Application",
+  "homepage": "https://ccoreilly.github.io/agent-softcatala",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
