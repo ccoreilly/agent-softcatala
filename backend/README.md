@@ -1,99 +1,73 @@
 # LangChain Chat Agent Backend
 
-A modern chat agent backend built with FastAPI and LangChain, supporting multiple LLM providers including Ollama (local) and Zhipu AI (cloud).
+A powerful backend service that provides LLM-powered chat capabilities through both REST API and Telegram bot interfaces. Built with FastAPI and integrated with LangChain for advanced tool usage and multi-provider model support.
 
 ## Features
 
-- **Multiple LLM Providers**: Support for Ollama (local) and Zhipu AI (cloud)
-- **LangChain Integration**: Built on LangChain for robust agent capabilities
-- **Tool Support**: Web browsing, search, and Wikipedia tools
-- **Streaming Responses**: Real-time streaming chat responses
+- **Multi-Provider LLM Support**: Supports Ollama, Zhipu AI, and other providers
+- **Tool Integration**: Web browsing, Wikipedia search, and extensible tool system
+- **Streaming Responses**: Real-time response streaming for better user experience  
 - **Model Switching**: Dynamic switching between different models and providers
-- **Health Monitoring**: Comprehensive health checks for all providers
-- **Extensible Architecture**: Easy to add new providers and tools
+- **Telegram Bot**: Full-featured Telegram bot with conversation history
+- **Message History Management**: Rolling window conversation history (up to 20 user messages)
+- **Health Monitoring**: Comprehensive health checks and status reporting
 
-## Setup
+## Quick Start
 
-### 1. Install Dependencies
+### Environment Variables
 
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Environment Configuration
-
-Copy the example environment file and configure your settings:
+Create a `.env` file in the backend directory:
 
 ```bash
-cp .env.example .env
-```
-
-Edit `.env` with your configuration:
-
-```bash
-# Ollama Configuration
+# Required for basic functionality
 OLLAMA_URL=http://localhost:11434
 
-# Zhipu AI Configuration (optional)
-ZHIPUAI_API_KEY=your_zhipu_api_key_here
+# Optional: Zhipu AI support
+ZHIPU_API_KEY=your_zhipu_api_key
 
-# Other settings...
+# Optional: CORS configuration
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+
+# Optional: Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+TELEGRAM_MAX_USER_MESSAGES=20
+
+# Optional: Search tool configuration
+SEARCH_API_KEY=your_search_api_key
 ```
 
-### 3. Set up Ollama (for local models)
+### Installation
 
-1. Install Ollama from [https://ollama.ai](https://ollama.ai)
-2. Start Ollama service:
+1. **Install Dependencies**:
    ```bash
-   ollama serve
+   pip install -r requirements.txt
    ```
-3. Pull a model:
+
+2. **Start the Service**:
    ```bash
-   ollama pull llama3.2
+   python main.py
    ```
 
-### 4. Set up Zhipu AI (optional)
-
-1. Sign up at [https://open.bigmodel.cn](https://open.bigmodel.cn)
-2. Get your API key
-3. Add it to your `.env` file
-
-## Running the Backend
-
-### Development
-
-```bash
-python main.py
-```
-
-### Production
-
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000
-```
-
-### Docker
-
-```bash
-docker build -t langchain-chat-agent .
-docker run -p 8000:8000 --env-file .env langchain-chat-agent
-```
+The service will automatically:
+- Start the HTTP API on port 8000
+- Start the Telegram bot (if `TELEGRAM_BOT_TOKEN` is provided)
+- Initialize available LLM providers and tools
 
 ## API Endpoints
 
 ### Core Endpoints
 
-- `GET /` - API information and status
-- `GET /health` - Comprehensive health check
-- `POST /chat/stream` - Stream chat responses
+- `GET /` - Service information and status
+- `GET /health` - Detailed health check with provider status
+- `POST /chat/stream` - Stream chat responses (SSE format)
 - `GET /models` - List available models from all providers
-- `POST /models/switch` - Switch to a different model
+- `POST /models/switch` - Switch active model
 - `GET /tools` - List available tools
-- `GET /providers` - Get provider information
+- `GET /providers` - Provider status and capabilities
 
-### Example Usage
+### Chat Streaming
 
-#### Chat with Streaming
+The `/chat/stream` endpoint supports Server-Sent Events (SSE) for real-time streaming:
 
 ```bash
 curl -X POST "http://localhost:8000/chat/stream" \
@@ -102,191 +76,183 @@ curl -X POST "http://localhost:8000/chat/stream" \
     "messages": [
       {"role": "user", "content": "Hello, how are you?"}
     ],
-    "session_id": "test-session",
+    "session_id": "test_session",
     "provider": "ollama",
-    "model": "llama3.2"
+    "model": "llama2"
   }'
 ```
 
-#### Switch Model
-
-```bash
-curl -X POST "http://localhost:8000/models/switch" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "provider": "zhipu",
-    "model": "glm-4",
-    "temperature": 0.8
-  }'
+Response chunks:
+```json
+{"type": "content", "content": "Hello! I'm doing well...", "timestamp": "2024-01-01T12:00:00"}
+{"type": "tool_call", "tool": "search", "parameters": {...}, "timestamp": "2024-01-01T12:00:01"}
+{"type": "tool_result", "tool": "search", "result": {...}, "timestamp": "2024-01-01T12:00:02"}
 ```
 
-#### Get Available Models
+## Telegram Bot
 
-```bash
-curl "http://localhost:8000/models"
+### Setup
+
+1. **Create a Telegram Bot**:
+   - Contact [@BotFather](https://t.me/BotFather) on Telegram
+   - Create a new bot with `/newbot`
+   - Copy the bot token
+
+2. **Configure Environment**:
+   ```bash
+   TELEGRAM_BOT_TOKEN=your_bot_token_here
+   TELEGRAM_MAX_USER_MESSAGES=20  # Optional, defaults to 20
+   ```
+
+3. **Start the Service**:
+   ```bash
+   python main.py
+   ```
+
+### Bot Commands
+
+- `/start` - Welcome message and introduction
+- `/help` - Detailed help and command reference
+- `/clear` - Clear conversation history
+- `/history` - Show conversation statistics
+- `/status` - Check bot and AI model status
+
+### Message History Management
+
+The Telegram bot maintains conversation context with a rolling window approach:
+
+- **Rolling Window**: Keeps the last 20 user messages (configurable)
+- **Context Preservation**: All agent responses between user messages are preserved
+- **Automatic Cleanup**: Older messages are automatically removed when limit is exceeded
+- **Per-User Storage**: Each Telegram user has independent message history
+- **Memory Efficient**: History is stored in memory and cleaned up automatically
+
+Example conversation flow:
+```
+User: "Hello" → Stored (user message #1)
+Bot: "Hi there! How can I help?" → Stored (agent response)
+User: "What's the weather?" → Stored (user message #2)
+Bot: "I'll search for weather info..." → Stored (agent response)
+... (continues until 20 user messages)
+User: "New question" → Stored (user message #21)
+    → Message #1 and its responses are removed
+    → Messages #2-21 and their responses are kept
 ```
 
-## Supported Providers
+### Bot Features
+
+- **Real-time Streaming**: Messages are updated in real-time as the AI generates responses
+- **Tool Usage Indicators**: Shows when tools are being used (web search, etc.)
+- **Error Handling**: Graceful error handling with user-friendly messages
+- **Typing Indicators**: Shows typing status while processing
+- **Markdown Support**: Supports basic Markdown formatting in responses
+- **Concurrent Safety**: Prevents message processing conflicts per user
+
+## Model Providers
 
 ### Ollama (Local)
 
-- **Models**: Any model available in your local Ollama installation
-- **Advantages**: Privacy, no API costs, full control
-- **Requirements**: Ollama service running locally
+Supports local Ollama installations:
 
-Popular models:
-- `llama3.2` (recommended)
-- `llama3.1`
-- `mistral`
-- `codellama`
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a model
+ollama pull llama2
+
+# Configure backend
+OLLAMA_URL=http://localhost:11434
+```
 
 ### Zhipu AI (Cloud)
 
-- **Models**: `glm-4`, `glm-4v`, `glm-3-turbo`
-- **Advantages**: High performance, multimodal support (glm-4v)
-- **Requirements**: API key from Zhipu AI
+Supports Zhipu AI's commercial API:
 
-## Tools
+```bash
+ZHIPU_API_KEY=your_api_key
+```
 
-The backend supports various tools for enhanced capabilities:
+## Tool System
 
-### Built-in Tools
+### Available Tools
 
 1. **Web Browser Tool**: Browse and extract content from web pages
-2. **DuckDuckGo Search**: Web search capabilities
-3. **Wikipedia**: Search and retrieve Wikipedia articles
+2. **Search Tool**: Web search capabilities (requires API key)
+3. **Wikipedia Tool**: Search and retrieve Wikipedia content
 
 ### Adding Custom Tools
 
-To add a custom tool:
+Tools are automatically discovered from the `tools/` directory. Create new tools by:
 
-1. Create a tool class inheriting from `BaseTool`
-2. Register it in the agent initialization
-3. The tool will be automatically available to the LLM
+1. Inheriting from `BaseTool`
+2. Implementing required methods
+3. Adding to the tools list in `main.py`
 
-Example:
-
+Example tool structure:
 ```python
-from tools.base import BaseTool, ToolDefinition, ToolParameter
+from tools.base import BaseTool
 
 class CustomTool(BaseTool):
-    @property
-    def definition(self) -> ToolDefinition:
-        return ToolDefinition(
+    def __init__(self):
+        super().__init__(
             name="custom_tool",
-            description="My custom tool",
-            parameters=[
-                ToolParameter(
-                    name="input",
-                    type="string",
-                    description="Input parameter",
-                    required=True
-                )
-            ]
+            description="Description of what the tool does",
+            parameters=[...]
         )
     
-    async def execute(self, **kwargs) -> Dict[str, Any]:
+    async def execute(self, **kwargs):
         # Tool implementation
-        return {"result": "success"}
+        return {"result": "tool output"}
 ```
-
-## Architecture
-
-### Model Management
-
-The `ModelManager` class handles multiple LLM providers:
-
-```python
-from models.model_manager import ModelManager
-
-manager = ModelManager()
-model = manager.get_model("ollama", "llama3.2")
-```
-
-### Provider System
-
-Each provider implements the `BaseProvider` interface:
-
-- `OllamaProvider`: Local Ollama integration
-- `ZhipuProvider`: Zhipu AI cloud integration
-
-### LangChain Integration
-
-The agent uses LangChain's:
-- `ChatOllama` for Ollama models
-- `ChatZhipuAI` for Zhipu AI models
-- Agent framework for tool calling
-- Streaming capabilities
 
 ## Configuration
 
-### Environment Variables
+### Environment Variables Reference
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OLLAMA_URL` | Ollama service URL | `http://localhost:11434` |
-| `ZHIPUAI_API_KEY` | Zhipu AI API key | None |
-| `DEFAULT_PROVIDER` | Default LLM provider | `ollama` |
-| `DEFAULT_MODEL` | Default model name | `llama3.2` |
-| `CORS_ORIGINS` | Allowed CORS origins | `http://localhost:3000` |
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `OLLAMA_URL` | Ollama service URL | `http://localhost:11434` | No |
+| `ZHIPU_API_KEY` | Zhipu AI API key | None | No |
+| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | `http://localhost:3000` | No |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token | None | No |
+| `TELEGRAM_MAX_USER_MESSAGES` | Max user messages in history | `20` | No |
+| `SEARCH_API_KEY` | Search API key for web search | None | No |
 
-### Model Parameters
+### Running Options
 
-You can configure model parameters globally or per-request:
+1. **HTTP Only** (no Telegram token):
+   ```bash
+   python main.py  # Starts only HTTP API
+   ```
 
-- `temperature`: Controls randomness (0.0 - 1.0)
-- `max_tokens`: Maximum response length
-- `top_p`: Nucleus sampling parameter
+2. **HTTP + Telegram Bot**:
+   ```bash
+   TELEGRAM_BOT_TOKEN=your_token python main.py  # Starts both services
+   ```
 
-## Troubleshooting
+3. **Docker**:
+   ```bash
+   docker build -t langchain-backend .
+   docker run -p 8000:8000 -e TELEGRAM_BOT_TOKEN=your_token langchain-backend
+   ```
 
-### Common Issues
+## Health Monitoring
 
-1. **Ollama not accessible**
-   - Ensure Ollama service is running: `ollama serve`
-   - Check the URL in your configuration
-   - Verify firewall settings
-
-2. **Zhipu AI authentication failed**
-   - Check your API key
-   - Ensure it's properly set in environment variables
-   - Verify your account has sufficient credits
-
-3. **Model not found**
-   - For Ollama: Pull the model with `ollama pull <model-name>`
-   - For Zhipu AI: Use supported model names (`glm-4`, `glm-3-turbo`)
-
-4. **Tools not working**
-   - Check internet connectivity for search tools
-   - Verify tool permissions and configurations
-
-### Logs
-
-The backend provides detailed logging. Set `LOG_LEVEL=DEBUG` in your environment for verbose output.
-
-## Performance
-
-### Recommendations
-
-1. **Local Development**: Use Ollama with smaller models (3B-7B parameters)
-2. **Production**: Consider Zhipu AI for better performance and reliability
-3. **Scaling**: Use multiple Ollama instances behind a load balancer
-4. **Caching**: Implement response caching for repeated queries
-
-### Monitoring
-
-The `/health` endpoint provides comprehensive health information:
+The `/health` endpoint provides comprehensive status information:
 
 ```json
 {
-  "agent": "healthy",
+  "status": "healthy",
+  "timestamp": "2024-01-01T12:00:00Z",
   "models": {
     "ollama": {
-      "status": "healthy",
-      "available_models": ["llama3.2", "mistral"]
+      "status": "available",
+      "available_models": ["llama2", "codellama"],
+      "current_model": "llama2"
     },
     "zhipu": {
-      "status": "healthy",
+      "status": "configured",
       "available_models": ["glm-4", "glm-3-turbo"]
     }
   },
@@ -297,41 +263,85 @@ The `/health` endpoint provides comprehensive health information:
 }
 ```
 
+## Logging
+
+The backend provides detailed logging for monitoring and debugging:
+
+- **INFO Level**: Service startup, model switches, successful requests
+- **ERROR Level**: Service errors, model failures, tool errors
+- **DEBUG Level**: Detailed request/response information (when enabled)
+
+Log format:
+```
+2024-01-01 12:00:00,000 - langchain_agent - INFO - Agent initialized successfully
+2024-01-01 12:00:01,000 - telegram_bot - INFO - Started conversation with user 12345
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Ollama Connection Failed**:
+   ```bash
+   # Check if Ollama is running
+   curl http://localhost:11434/api/tags
+   
+   # Start Ollama if needed
+   ollama serve
+   ```
+
+2. **Model Not Found**:
+   ```bash
+   # List available models
+   ollama list
+   
+   # Pull required model
+   ollama pull llama2
+   ```
+
+3. **Telegram Bot Not Responding**:
+   - Verify bot token is correct
+   - Check bot is not already running elsewhere
+   - Ensure network connectivity to Telegram API
+
+4. **Tools Not Working**:
+   - Check API keys for search tools
+   - Verify network connectivity for web tools
+   - Check tool configuration in logs
+
+### Performance Tuning
+
+- **Memory Usage**: Adjust `TELEGRAM_MAX_USER_MESSAGES` for memory optimization
+- **Response Speed**: Use faster models for quicker responses
+- **Concurrent Users**: Monitor resource usage with multiple Telegram users
+
 ## Development
 
 ### Project Structure
 
 ```
 backend/
-├── main.py                 # FastAPI application
-├── langchain_agent.py      # Main agent implementation
-├── models/                 # Model management
-│   ├── model_manager.py    # Central model manager
-│   └── providers/          # Provider implementations
+├── main.py                 # Main service entry point
+├── langchain_agent.py      # LangChain agent implementation
+├── telegram_bot.py         # Telegram bot implementation
+├── message_history.py      # Message history management
 ├── tools/                  # Tool implementations
 │   ├── base.py            # Base tool interface
-│   ├── langchain_tools.py # LangChain tool wrappers
-│   └── web_browser.py     # Web browser tool
+│   ├── web_browser.py     # Web browsing tool
+│   └── langchain_tools.py # LangChain tool wrappers
+├── models/                 # Model configurations
 ├── requirements.txt        # Dependencies
-└── .env.example           # Environment template
-```
-
-### Testing
-
-Run tests (when available):
-
-```bash
-pytest tests/
+└── README.md              # This file
 ```
 
 ### Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+1. Follow existing code patterns and documentation
+2. Add comprehensive error handling
+3. Include logging for debugging
+4. Test with both HTTP API and Telegram bot
+5. Update documentation for new features
 
 ## License
 
-This project is licensed under the MIT License. See LICENSE file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.

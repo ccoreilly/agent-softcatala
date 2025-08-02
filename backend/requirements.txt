@@ -21,3 +21,6 @@ PyJWT==2.8.0
 # Additional LangChain tools
 pypdf==3.17.0
 chromadb==0.4.15
+
+# Telegram bot dependency
+python-telegram-bot==21.0.1
