@@ -10,7 +10,8 @@ The original agent tools have been **disabled** but kept in the codebase for eas
 - **Wikipedia Tool**: Wikipedia search and content retrieval
 
 ### Active Tools
-- **CatalanSynonymsTool**: New tool for searching Catalan synonyms using the Softcatalà dictionary API
+- **CatalanSynonymsTool**: Tool for searching Catalan synonyms using the Softcatalà dictionary API
+- **CatalanSpellCheckerTool**: Tool for checking Catalan text for spelling, grammar, and style errors using the Softcatalà corrector API. Supports central Catalan (general), Valencian, and Balearic dialects.
 
 ## Re-enabling Original Tools
 
@@ -35,9 +36,27 @@ And comment out:
 
 ## Catalan Synonyms Tool
 
-The new `CatalanSynonymsTool` provides access to the Softcatalà dictionary API with three main functions:
+The `CatalanSynonymsTool` provides access to the Softcatalà dictionary API with three main functions:
 
-### Actions:
+1. **search**: Get synonyms for a word
+2. **autocomplete**: Get word suggestions
+3. **index**: Get words starting with a prefix
+
+## Catalan Spell Checker Tool
+
+The new `CatalanSpellCheckerTool` provides comprehensive spell and grammar checking for Catalan text using the Softcatalà corrector API with these features:
+
+1. **Spelling correction**: Detects and suggests corrections for misspelled words
+2. **Grammar checking**: Identifies grammatical errors with suggestions
+3. **Dialect support**: Automatically detects or allows manual selection between central Catalan (general), Valencian, and Balearic
+4. **Detailed error analysis**: Categorizes errors by type (spelling, grammar, style, etc.)
+5. **Context-aware suggestions**: Provides contextually appropriate correction suggestions
+
+### Spell Checker Parameters:
+- `text` (required): The Catalan text to check for errors
+- `dialect` (optional): Catalan dialect - 'general' for central Catalan, 'valencia' for Valencian, 'balear' for Balearic, or 'auto' for automatic detection (default: 'auto')
+
+### Synonyms Tool Actions:
 1. **search**: Get synonyms and antonyms for a Catalan word
 2. **autocomplete**: Get word suggestions for a given prefix  
 3. **index**: Get words from the dictionary index starting with a prefix

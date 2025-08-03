@@ -13,6 +13,7 @@ from langchain_agent import LangChainAgent
 from tools.web_browser import WebBrowserTool
 from tools.langchain_tools import create_search_tool, create_wikipedia_tool
 from tools.catalan_synonyms import CatalanSynonymsTool
+from tools.catalan_spell_checker import CatalanSpellCheckerTool
 
 # Configure logging
 logging.basicConfig(
@@ -80,12 +81,13 @@ try:
     # search_tool = create_search_tool()
     # wikipedia_tool = create_wikipedia_tool()
     
-    # New Catalan Synonyms tool
+    # New Catalan tools
     catalan_synonyms_tool = CatalanSynonymsTool()
+    catalan_spell_checker_tool = CatalanSpellCheckerTool()
 
     # Initialize LangChain agent with selected type - DISABLED TOOLS
     # agent = LangChainAgent(tools=[web_browser_tool, search_tool, wikipedia_tool], agent_type=agent_type)
-    agent = LangChainAgent(tools=[catalan_synonyms_tool], agent_type=agent_type)
+    agent = LangChainAgent(tools=[catalan_synonyms_tool, catalan_spell_checker_tool], agent_type=agent_type)
     logger.info(f"LangChain agent initialized successfully with type: {agent_type}")
     
 except Exception as e:
