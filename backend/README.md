@@ -48,6 +48,10 @@ OLLAMA_URL=http://localhost:11434
 # OR
 ZHIPUAI_API_KEY=your_zhipu_api_key
 
+# Optional: Use custom endpoint (normally not needed)
+# Z.AI and Zhipu AI use the same API endpoint by default
+# ZHIPUAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
+
 # Optional: CORS configuration
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 
@@ -122,6 +126,66 @@ Response chunks:
 {"type": "tool_call", "tool": "search", "parameters": {...}, "timestamp": "2024-01-01T12:00:01"}
 {"type": "tool_result", "tool": "search", "result": {...}, "timestamp": "2024-01-01T12:00:02"}
 ```
+
+## Z.AI Integration
+
+The system now supports Z.AI (formerly Zhipu AI) with their latest GLM models. Z.AI offers OpenAI-compatible API endpoints with competitive pricing and performance.
+
+### Configuration
+Set the following environment variable:
+```bash
+ZHIPUAI_API_KEY=your_z_ai_api_key
+```
+
+The system automatically uses the correct Z.AI/Zhipu API endpoint. No additional configuration needed.
+
+### Models
+- **Default**: GLM-4.5-flash (fast, efficient, and cost-effective)
+- **Available models**:
+  - `glm-4.5-flash` - New default: fast, efficient, and optimized for most tasks
+  - `glm-4.5-air` - Lightweight model with excellent performance
+  - `glm-4.5` - Flagship model with maximum capabilities
+  - `glm-4`, `glm-4-plus`, `glm-4-flash` - Previous generation models
+  - `glm-3-turbo` - Legacy model
+
+### Features
+- **Hybrid Reasoning**: Supports both thinking mode (complex reasoning) and non-thinking mode (instant responses)
+- **Tool Integration**: Native function calling capabilities for agent applications
+- **128K Context**: Extended context length for long conversations
+- **Streaming Support**: Real-time response streaming
+- **Cost Effective**: Competitive pricing with high performance
+
+### API Compatibility
+The Z.AI provider is compatible with OpenAI-style chat completions and supports all standard parameters like temperature, max_tokens, etc.
+
+### Testing Your Configuration
+Run the included test script to verify your Z.AI setup:
+```bash
+python test_zai.py
+```
+
+This script will:
+- Verify your API key and endpoint configuration
+- Test the GLM-4.5-flash model
+- Perform a health check
+- Confirm all functionality is working
+
+### Endpoint Configuration
+By default, the system uses the standard Zhipu AI endpoint. To use the Z.AI endpoint as documented at docs.z.ai:
+
+```bash
+export ZHIPUAI_BASE_URL="https://open.bigmodel.cn/api/paas/v4/"
+```
+
+Or add to your `.env` file:
+```
+ZHIPUAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
+```
+
+### Model Features
+- **GLM-4.5-flash**: Ultra-fast inference, optimized for real-time applications
+- **GLM-4.5**: Full-featured model with advanced reasoning capabilities  
+- **GLM-4.5-air**: Lightweight version with balanced performance and efficiency
 
 ## Telegram Bot
 

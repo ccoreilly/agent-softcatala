@@ -44,8 +44,14 @@ class ModelManager:
         zhipu_api_key = os.getenv("ZHIPUAI_API_KEY")
         if zhipu_api_key:
             try:
-                self.providers[ModelProvider.ZHIPU] = ZhipuProvider(zhipu_api_key)
-                logger.info("Initialized Zhipu AI provider")
+                # Support Z.AI endpoint override
+                zhipu_base_url = os.getenv("ZHIPUAI_BASE_URL")
+                if zhipu_base_url:
+                    self.providers[ModelProvider.ZHIPU] = ZhipuProvider(zhipu_api_key, zhipu_base_url)
+                    logger.info(f"Initialized Zhipu AI provider with custom endpoint: {zhipu_base_url}")
+                else:
+                    self.providers[ModelProvider.ZHIPU] = ZhipuProvider(zhipu_api_key)
+                    logger.info("Initialized Zhipu AI provider with default endpoint")
             except Exception as e:
                 logger.warning(f"Failed to initialize Zhipu AI provider: {e}")
         else:
