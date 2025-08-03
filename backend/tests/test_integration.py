@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 # Mock imports for testing when full dependencies aren't available
 try:
     from langchain_agent import LangChainAgent
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     # Create a mock class for testing
     class LangChainAgent:
         def __init__(self, tools=None):
@@ -21,7 +21,7 @@ except ImportError:
 
 try:
     from tools.web_browser import WebBrowserTool
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     # Create a mock class for testing
     class WebBrowserTool:
         name = "web_browser"
