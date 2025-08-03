@@ -21,7 +21,40 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-load_dotenv()
+# Load .env file only if it exists
+env_file_path = ".env"
+if os.path.exists(env_file_path):
+    load_dotenv(env_file_path)
+    logger.info(f"Loaded environment variables from {env_file_path}")
+else:
+    logger.info("No .env file found, using system environment variables only")
+
+# Validate that at least one LLM provider is configured
+def validate_providers():
+    """Validate that at least one LLM provider is properly configured."""
+    ollama_url = os.getenv("OLLAMA_URL")
+    zhipu_api_key = os.getenv("ZHIPUAI_API_KEY")
+    
+    if not ollama_url and not zhipu_api_key:
+        error_msg = (
+            "No LLM providers configured. Please set at least one of:\n"
+            "- OLLAMA_URL (for Ollama provider)\n"
+            "- ZHIPUAI_API_KEY (for Zhipu AI provider)"
+        )
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+    
+    # Log which providers are configured
+    configured_providers = []
+    if ollama_url:
+        configured_providers.append(f"Ollama ({ollama_url})")
+    if zhipu_api_key:
+        configured_providers.append("Zhipu AI")
+    
+    logger.info(f"Configured providers: {', '.join(configured_providers)}")
+
+# Validate providers before starting the application
+validate_providers()
 
 app = FastAPI(title="API de l'Agent de Softcatalà", version="2.0.0")
 

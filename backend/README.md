@@ -16,14 +16,37 @@ A powerful backend service that provides LLM-powered chat capabilities through b
 
 ### Environment Variables
 
+You can configure the application in three ways:
+
+#### Option 1: Environment Variables (Recommended for production)
+```bash
+# Set environment variables directly
+export OLLAMA_URL=http://localhost:11434
+# OR
+export ZHIPUAI_API_KEY=your_zhipu_api_key
+
+# Optional configurations
+export CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+export TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+export TELEGRAM_MAX_USER_MESSAGES=20
+export SEARCH_API_KEY=your_search_api_key
+
+# Start the application
+python3 main.py
+```
+
+#### Option 2: .env file (Recommended for development)
 Create a `.env` file in the backend directory:
 
 ```bash
-# Required for basic functionality
-OLLAMA_URL=http://localhost:11434
+# Copy the template
+cp .env.example .env
 
-# Optional: Zhipu AI support
-ZHIPU_API_KEY=your_zhipu_api_key
+# Edit .env with your settings
+# At minimum, set ONE of these:
+OLLAMA_URL=http://localhost:11434
+# OR
+ZHIPUAI_API_KEY=your_zhipu_api_key
 
 # Optional: CORS configuration
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
@@ -35,6 +58,17 @@ TELEGRAM_MAX_USER_MESSAGES=20
 # Optional: Search tool configuration
 SEARCH_API_KEY=your_search_api_key
 ```
+
+#### Option 3: Inline environment variables
+```bash
+# Quick start with Ollama
+OLLAMA_URL=http://localhost:11434 python3 main.py
+
+# Quick start with Zhipu AI
+ZHIPUAI_API_KEY=your_api_key python3 main.py
+```
+
+**Important**: At least one of `OLLAMA_URL` or `ZHIPUAI_API_KEY` must be set for the application to start.
 
 ### Installation
 
