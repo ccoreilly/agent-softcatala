@@ -34,6 +34,10 @@ app.add_middleware(
 )
 
 # Initialize agent with tools
+# Agent type can be: "softcatala_english" (default), "softcatala_catalan", or "generic"
+agent_type = os.getenv("AGENT_TYPE", "softcatala_english")
+logger.info(f"Initializing agent with type: {agent_type}")
+
 try:
     # Legacy tool
     web_browser_tool = WebBrowserTool()
@@ -42,15 +46,15 @@ try:
     search_tool = create_search_tool()
     wikipedia_tool = create_wikipedia_tool()
     
-    # Initialize LangChain agent
-    agent = LangChainAgent(tools=[web_browser_tool, search_tool, wikipedia_tool])
-    logger.info("LangChain agent initialized successfully")
+    # Initialize LangChain agent with selected type
+    agent = LangChainAgent(tools=[web_browser_tool, search_tool, wikipedia_tool], agent_type=agent_type)
+    logger.info(f"LangChain agent initialized successfully with type: {agent_type}")
     
 except Exception as e:
     logger.error(f"Failed to initialize agent: {e}")
     # Initialize without tools as fallback
-    agent = LangChainAgent(tools=[])
-    logger.warning("Agent initialized without tools")
+    agent = LangChainAgent(tools=[], agent_type=agent_type)
+    logger.warning(f"Agent initialized without tools with type: {agent_type}")
 
 class ChatMessage(BaseModel):
     role: str
