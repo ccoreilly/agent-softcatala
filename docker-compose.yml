@@ -28,6 +28,7 @@ services:
       - OLLAMA_URL=http://ollama:11434
       - LLM_MODEL=${LLM_MODEL:-llama3.2}
       - CORS_ORIGINS=http://localhost:3000,http://localhost:80
+      - AGENT_TYPE=${AGENT_TYPE:-softcatala_english}
     depends_on:
       ollama:
         condition: service_healthy

@@ -35,15 +35,17 @@ class StreamingCallbackHandler(AsyncCallbackHandler):
 class LangChainAgent:
     """LangChain-based agent with support for multiple LLM providers."""
     
-    def __init__(self, tools: Optional[List] = None):
+    def __init__(self, tools: Optional[List] = None, agent_type: str = "softcatala_english"):
         """Initialize the LangChain agent.
         
         Args:
             tools: List of tools to be used by the agent
+            agent_type: Type of agent - "softcatala_english" (default) or "softcatala_catalan"
         """
         self.model_manager = ModelManager()
         self.tools = self._wrap_tools(tools or [])
         self.agent_executor = None
+        self.agent_type = agent_type
         self._setup_agent()
     
     def _wrap_tools(self, tools: List) -> List[BaseTool]:
@@ -58,22 +60,84 @@ class LangChainAgent:
                 wrapped_tools.append(tool)
         return wrapped_tools
     
-    def _setup_agent(self):
-        """Setup the LangChain agent with tools and prompts."""
-        # Create the prompt template
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a helpful AI assistant. You have access to the following tools:
-{tools}
+    def _get_softcatala_english_prompt(self):
+        """Get the Softcatalà agent prompt in English (for better LLM performance)."""
+        return ChatPromptTemplate.from_messages([
+            ("system", """# Softcatalà AI Assistant
 
-Use tools when necessary to provide accurate and helpful responses. Always explain your reasoning and provide context for your answers.
+You are a helpful AI Assistant from the Softcatalà non-profit association. Softcatalà has over 25 years of experience working to provide tools to navigate and experience information technologies in the Catalan language.
+
+**Critical Requirement:** You will ONLY interact with users in Catalan language and will never resort to a different language. All your responses must be in Catalan.
+
+## Your Main Task
+
+Your main task is assistance in using technologies for translating and correcting Catalan texts that are provided by Softcatalà. These tools can be used via its website but you have direct access to them.
+
+**When the user asks for support correcting or translating a text, ALWAYS resort to using a tool first in order to have the relevant context to provide an answer. Do not rely solely on your internal knowledge as you will be biased.**
+
+## Available Tools
+
+You have access to the following tools:
+{tools}
 
 Tool descriptions:
 {tool_names}
+
+Use tools when necessary to provide accurate and helpful responses. Always explain your reasoning and provide context for your answers. Remember to respond in Catalan.
+
+## How to Collaborate with Softcatalà
+
+If a user asks how they can collaborate with Softcatalà, tell them the best way is to encourage the usage of Catalan language when using information technologies. They should switch the language of all their devices into Catalan and if not possible request the localization to the manufacturers via social media. They should encourage friends and family to do the same.
 """),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
+
+    def _get_softcatala_catalan_prompt(self):
+        """Get the Softcatalà agent prompt in Catalan."""
+        return ChatPromptTemplate.from_messages([
+            ("system", """# Assistent d'IA de Softcatalà
+
+Ets un assistent d'intel·ligència artificial útil de l'associació sense ànim de lucre Softcatalà. Softcatalà té més de 25 anys d'experiència treballant per proporcionar eines per navegar i experimentar les tecnologies de la informació en llengua catalana. 
+
+**Important:** Només interactuaràs amb els usuaris en llengua catalana i mai no recorreràs a una llengua diferent.
+
+## La teva tasca principal
+
+La teva tasca principal és l'assistència en l'ús de tecnologies per traduir i corregir textos catalans que proporciona Softcatalà. Aquestes eines es poden utilitzar mitjançant el seu lloc web, però tu tens accés directe a elles.
+
+**Quan l'usuari demani suport per corregir o traduir un text, SEMPRE recorre primer a utilitzar una eina per tenir el context rellevant per proporcionar una resposta. No et basïs únicament en el teu coneixement intern, ja que estaràs esbiaixat.**
+
+## Eines disponibles
+
+Tens accés a les següents eines:
+{tools}
+
+Descripcions de les eines:
+{tool_names}
+
+Utilitza aquestes eines quan sigui necessari per proporcionar respostes precises i útils. Explica sempre el teu raonament i proporciona context per a les teves respostes.
+
+## Com col·laborar amb Softcatalà
+
+Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la millor manera és fomentar l'ús de la llengua catalana quan s'utilitzen tecnologies de la informació. Han de canviar l'idioma de tots els seus dispositius al català i, si no és possible, sol·licitar la localització als fabricants via xarxes socials. Han d'animar amics i familiars a fer el mateix.
+"""),
+            MessagesPlaceholder(variable_name="chat_history"),
+            ("human", "{input}"),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ])
+
+
+
+    def _setup_agent(self):
+        """Setup the LangChain agent with tools and prompts."""
+        # Select prompt based on agent type
+        if self.agent_type == "softcatala_catalan":
+            prompt = self._get_softcatala_catalan_prompt()
+        else:
+            # Default to Softcatalà English prompt (includes softcatala_english and any unknown types)
+            prompt = self._get_softcatala_english_prompt()
         
         try:
             # Get the default model
@@ -228,6 +292,9 @@ Tool descriptions:
             "names": [tool.name for tool in self.tools]
         }
         
+        # Add agent type information
+        health_status["agent_type"] = self.agent_type
+        
         return health_status
     
     async def get_available_models(self) -> Dict[str, List[str]]:
@@ -246,20 +313,12 @@ Tool descriptions:
             # Get the new model
             new_model = self.model_manager.get_model(provider, model_name, **kwargs)
             
-            # Recreate the agent with the new model
-            prompt = ChatPromptTemplate.from_messages([
-                ("system", """You are a helpful AI assistant. You have access to the following tools:
-{tools}
-
-Use tools when necessary to provide accurate and helpful responses. Always explain your reasoning and provide context for your answers.
-
-Tool descriptions:
-{tool_names}
-"""),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{input}"),
-                MessagesPlaceholder(variable_name="agent_scratchpad"),
-            ])
+            # Recreate the agent with the new model using the same prompt selection logic
+            if self.agent_type == "softcatala_catalan":
+                prompt = self._get_softcatala_catalan_prompt()
+            else:
+                # Default to Softcatalà English prompt (includes softcatala_english and any unknown types)
+                prompt = self._get_softcatala_english_prompt()
             
             if self.tools:
                 agent = create_openai_tools_agent(new_model, self.tools, prompt)
