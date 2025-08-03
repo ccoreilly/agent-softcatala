@@ -12,55 +12,9 @@ import sys
 # Add backend directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-# Handle imports gracefully for testing with minimal dependencies
-try:
-    from main import app
-except (ImportError, ModuleNotFoundError) as e:
-    # If main.py can't be imported due to missing dependencies, create a mock FastAPI app
-    from fastapi import FastAPI, HTTPException
-    app = FastAPI()
-    
-    # Add all basic routes that tests expect
-    @app.get("/")
-    async def root():
-        return {
-            "message": "API de l'Agent de Softcatalà",
-            "status": "funcionant",
-            "version": "2.0.0",
-            "features": ["ollama", "zhipu_ai", "langchain", "tools", "telegram_bot"]
-        }
-    
-    @app.get("/health")
-    async def health():
-        return {"status": "healthy"}
-    
-    @app.get("/models")
-    async def get_models():
-        return {"providers": []}
-    
-    @app.post("/models/switch")
-    async def switch_model(request: dict):
-        return {"message": "Model switched"}
-    
-    @app.get("/tools")
-    async def get_tools():
-        return {"count": 0, "tools": [], "status": "disponible"}
-    
-    @app.get("/providers")
-    async def get_providers():
-        return {"providers": []}
-    
-    @app.post("/chat/stream")
-    async def chat_stream(request: dict):
-        return {"message": "Chat response"}
-
-try:
-    from langchain_agent import LangChainAgent
-except (ImportError, ModuleNotFoundError):
-    # Create a mock class for testing
-    class LangChainAgent:
-        def __init__(self, tools=None):
-            self.tools = tools or []
+# Import works thanks to our comprehensive mocking system in conftest.py
+from main import app
+from langchain_agent import LangChainAgent
 
 
 @pytest.fixture
