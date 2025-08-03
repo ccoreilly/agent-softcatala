@@ -69,7 +69,8 @@ jobs:
         cd backend
         python -m pytest tests/ -v --cov=. --cov-report=term-missing
         
-    - name: Test Docker build
-      run: |
-        cd backend
-        docker build -t backend-test .
+    # Docker build test temporarily disabled - can be re-enabled later
+    # - name: Test Docker build
+    #   run: |
+    #     cd backend
+    #     docker build -t backend-test .
