@@ -1,0 +1,28 @@
+# Core FastAPI dependencies
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic==2.10.0
+httpx==0.27.0
+python-multipart==0.0.12
+beautifulsoup4==4.12.3
+requests==2.32.0
+aiofiles==24.1.0
+python-dotenv==1.0.1
+
+# Zhipu AI dependencies
+httpx-sse==0.4.0
+PyJWT==2.10.0
+
+# PDF processing (using PyPDF2 instead of pypdf for better compatibility)
+PyPDF2==3.0.1
+
+# Telegram bot dependency
+python-telegram-bot==21.9
+
+# LangChain dependencies (minimal set to avoid Rust compilation issues)
+langchain-core==0.3.21
+langchain-text-splitters==0.3.2
+
+# Alternative to full langchain package to avoid heavy dependencies
+# If you need more LangChain features, add them individually:
+# langchain-community==0.3.7

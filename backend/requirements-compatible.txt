@@ -1,3 +1,4 @@
+# Compatible versions that work together
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
@@ -12,12 +13,11 @@ python-dotenv==1.0.0
 httpx-sse==0.4.0
 PyJWT==2.8.0
 
-# PDF processing (alternative to pypdf)
+# PDF processing
 PyPDF2==3.0.1
 
-# Telegram bot dependency
+# Telegram bot dependency (using compatible httpx version)
 python-telegram-bot==21.0.1
 
-# Basic LangChain without heavy dependencies
+# Basic LangChain (minimal to avoid Rust compilation)
 # langchain-core>=0.2.38,<0.3.0
-# Note: Comment out LangChain temporarily to test if it's the source of the issue
