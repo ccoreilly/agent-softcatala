@@ -11,7 +11,7 @@ The original agent tools have been **disabled** but kept in the codebase for eas
 
 ### Active Tools
 - **CatalanSynonymsTool**: Tool for searching Catalan synonyms using the Softcatalà dictionary API
-- **CatalanSpellCheckerTool**: Tool for checking Catalan text for spelling, grammar, and style errors using the Softcatalà corrector API
+- **CatalanSpellCheckerTool**: Tool for checking Catalan text for spelling, grammar, and style errors using the Softcatalà corrector API. Supports central Catalan (general), Valencian, and Balearic dialects.
 
 ## Re-enabling Original Tools
 
@@ -48,13 +48,13 @@ The new `CatalanSpellCheckerTool` provides comprehensive spell and grammar check
 
 1. **Spelling correction**: Detects and suggests corrections for misspelled words
 2. **Grammar checking**: Identifies grammatical errors with suggestions
-3. **Dialect support**: Automatically detects or allows manual selection between standard Catalan and Valencian
+3. **Dialect support**: Automatically detects or allows manual selection between central Catalan (general), Valencian, and Balearic
 4. **Detailed error analysis**: Categorizes errors by type (spelling, grammar, style, etc.)
 5. **Context-aware suggestions**: Provides contextually appropriate correction suggestions
 
 ### Spell Checker Parameters:
 - `text` (required): The Catalan text to check for errors
-- `dialect` (optional): Catalan dialect - 'general', 'valencia', or 'auto' for automatic detection (default: 'auto')
+- `dialect` (optional): Catalan dialect - 'general' for central Catalan, 'valencia' for Valencian, 'balear' for Balearic, or 'auto' for automatic detection (default: 'auto')
 
 ### Synonyms Tool Actions:
 1. **search**: Get synonyms and antonyms for a Catalan word

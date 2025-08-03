@@ -20,7 +20,7 @@ class CatalanSpellCheckerTool(BaseTool):
     def definition(self) -> ToolDefinition:
         return ToolDefinition(
             name="catalan_spell_checker",
-            description="Check Catalan text for spelling, grammar, and style errors. Supports both standard Catalan and Valencian dialects. Returns detailed error information with suggestions for corrections.",
+            description="Check Catalan text for spelling, grammar, and style errors. Supports central Catalan (general), Valencian, and Balearic dialects. Returns detailed error information with suggestions for corrections.",
             parameters=[
                 ToolParameter(
                     name="text",
@@ -31,7 +31,7 @@ class CatalanSpellCheckerTool(BaseTool):
                 ToolParameter(
                     name="dialect",
                     type="string",
-                    description="Catalan dialect to use: 'general' for standard Catalan or 'valencia' for Valencian. If not specified, the tool will automatically detect the appropriate dialect.",
+                    description="Catalan dialect to use: 'general' for central Catalan dialect, 'valencia' for Valencian, or 'balear' for Balearic. If not specified, the tool will automatically detect the appropriate dialect.",
                     required=False,
                     default="auto"
                 )
@@ -48,6 +48,8 @@ class CatalanSpellCheckerTool(BaseTool):
         # Determine language code based on dialect
         if dialect == "valencia":
             language_code = "ca-ES-valencia"
+        elif dialect == "balear":
+            language_code = "ca-ES-balear"
         elif dialect == "general":
             language_code = "ca-ES"
         else:  # auto detection
@@ -119,6 +121,8 @@ class CatalanSpellCheckerTool(BaseTool):
         detected_language_code = language_info.get("code", language_code)
         if "valencia" in detected_language_code.lower():
             detected_dialect = "valencia"
+        elif "balear" in detected_language_code.lower():
+            detected_dialect = "balear"
         
         # Count error types
         spelling_errors = len([e for e in errors if "spelling" in e["issue_type"].lower() or "ortogràfic" in e["category"].lower()])
