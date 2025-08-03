@@ -41,6 +41,8 @@ class TelegramBot:
         
         # Track ongoing conversations to prevent spam
         self.active_chats: Dict[str, bool] = {}
+        # Track last message content to prevent duplicate edits
+        self.last_message_content: Dict[str, str] = {}
     
     def setup_handlers(self) -> None:
         """Set up command and message handlers."""
@@ -176,6 +178,60 @@ class TelegramBot:
         
         await update.message.reply_text(status_message, parse_mode=ParseMode.MARKDOWN)
     
+    async def safe_edit_message(self, message, new_content: str, parse_mode=None, message_key: str = None) -> bool:
+        """
+        Safely edit a message, avoiding duplicate content errors.
+        
+        Args:
+            message: The message object to edit
+            new_content: The new content for the message
+            parse_mode: Telegram parse mode (optional)
+            message_key: Unique key to track this message's content
+        
+        Returns:
+            bool: True if message was edited successfully, False if skipped or failed
+        """
+        if message_key is None:
+            message_key = f"{message.chat_id}_{message.message_id}"
+        
+        # Check if content is the same as last time
+        if message_key in self.last_message_content:
+            if self.last_message_content[message_key] == new_content:
+                return False  # Skip editing, content is the same
+        
+        try:
+            if parse_mode:
+                await message.edit_text(new_content, parse_mode=parse_mode)
+            else:
+                await message.edit_text(new_content)
+            
+            # Track the new content
+            self.last_message_content[message_key] = new_content
+            return True
+            
+        except Exception as e:
+            # Check if it's the "not modified" error specifically
+            if "Message is not modified" in str(e):
+                logger.debug(f"Message content unchanged, skipping edit: {message_key}")
+                return False
+            else:
+                logger.warning(f"Failed to edit message {message_key}: {e}")
+                return False
+    
+    def cleanup_old_message_tracking(self, max_entries: int = 1000) -> None:
+        """
+        Clean up old message content tracking to prevent memory leaks.
+        
+        Args:
+            max_entries: Maximum number of entries to keep
+        """
+        if len(self.last_message_content) > max_entries:
+            # Remove oldest entries (simple approach - remove first half)
+            keys_to_remove = list(self.last_message_content.keys())[:len(self.last_message_content) // 2]
+            for key in keys_to_remove:
+                self.last_message_content.pop(key, None)
+            logger.info(f"Cleaned up {len(keys_to_remove)} old message tracking entries")
+    
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle regular text messages."""
         chat_id = str(update.effective_chat.id)
@@ -191,6 +247,10 @@ class TelegramBot:
         try:
             # Mark chat as active
             self.active_chats[chat_id] = True
+            
+            # Periodic cleanup of message tracking (every 100 messages)
+            if len(self.last_message_content) > 100 and len(self.last_message_content) % 100 == 0:
+                self.cleanup_old_message_tracking()
             
             # Show typing indicator
             await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
@@ -220,50 +280,84 @@ class TelegramBot:
                             
                             # Update message every few chunks or when we have substantial content
                             if len(response_parts) % 3 == 0 or len(full_response) > 100:
-                                try:
-                                    await thinking_msg.edit_text(
+                                message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                                # Try with markdown first
+                                success = await self.safe_edit_message(
+                                    thinking_msg,
+                                    f"🤖 {full_response}",
+                                    parse_mode=ParseMode.MARKDOWN,
+                                    message_key=message_key
+                                )
+                                # If markdown fails, try without it
+                                if not success:
+                                    await self.safe_edit_message(
+                                        thinking_msg,
                                         f"🤖 {full_response}",
-                                        parse_mode=ParseMode.MARKDOWN
+                                        message_key=message_key
                                     )
-                                except Exception:
-                                    # If markdown fails, try without it
-                                    try:
-                                        await thinking_msg.edit_text(f"🤖 {full_response}")
-                                    except Exception:
-                                        pass  # Message might be too long or other issue
                     
                     elif chunk_type == "tool_call":
                         tool_name = chunk.get("tool", "unknown")
-                        await thinking_msg.edit_text(f"🔧 Utilitzant eina: {tool_name}...")
+                        message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                        await self.safe_edit_message(
+                            thinking_msg,
+                            f"🔧 Utilitzant eina: {tool_name}...",
+                            message_key=message_key
+                        )
                     
                     elif chunk_type == "tool_result":
-                        await thinking_msg.edit_text("🤔 Processant resultats d'eines...")
+                        message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                        await self.safe_edit_message(
+                            thinking_msg,
+                            "🤔 Processant resultats d'eines...",
+                            message_key=message_key
+                        )
                     
                     elif chunk_type == "error":
                         error_msg = chunk.get("error", "Error desconegut")
-                        await thinking_msg.edit_text(f"❌ Error: {error_msg}")
+                        message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                        await self.safe_edit_message(
+                            thinking_msg,
+                            f"❌ Error: {error_msg}",
+                            message_key=message_key
+                        )
                         return
                 
                 # Final response
                 if full_response:
-                    try:
-                        await thinking_msg.edit_text(
+                    message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                    # Try with markdown first
+                    success = await self.safe_edit_message(
+                        thinking_msg,
+                        f"🤖 {full_response}",
+                        parse_mode=ParseMode.MARKDOWN,
+                        message_key=message_key
+                    )
+                    # If markdown fails, try without it
+                    if not success:
+                        await self.safe_edit_message(
+                            thinking_msg,
                             f"🤖 {full_response}",
-                            parse_mode=ParseMode.MARKDOWN
+                            message_key=message_key
                         )
-                    except Exception:
-                        # If markdown fails, try without it
-                        await thinking_msg.edit_text(f"🤖 {full_response}")
                     
                     # Add assistant response to history
                     self.message_history.add_message(chat_id, "assistant", full_response)
                 else:
-                    await thinking_msg.edit_text("🤖 Ho sento, no he pogut generar una resposta.")
+                    message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                    await self.safe_edit_message(
+                        thinking_msg,
+                        "🤖 Ho sento, no he pogut generar una resposta.",
+                        message_key=message_key
+                    )
                 
             except Exception as e:
                 logger.error(f"Error during agent streaming: {e}")
-                await thinking_msg.edit_text(
-                    f"❌ Ho sento, he trobat un error: {str(e)}"
+                message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                await self.safe_edit_message(
+                    thinking_msg,
+                    f"❌ Ho sento, he trobat un error: {str(e)}",
+                    message_key=message_key
                 )
         
         except Exception as e:
@@ -275,6 +369,12 @@ class TelegramBot:
         finally:
             # Mark chat as no longer active
             self.active_chats[chat_id] = False
+            
+            # Clean up message content tracking for this conversation
+            # Remove entries that match the current thinking message
+            if 'thinking_msg' in locals():
+                message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                self.last_message_content.pop(message_key, None)
     
     async def start_bot(self) -> None:
         """Start the Telegram bot."""
