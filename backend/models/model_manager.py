@@ -30,12 +30,15 @@ class ModelManager:
     def _initialize_providers(self):
         """Initialize available providers based on configuration."""
         # Initialize Ollama provider
-        ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
-        try:
-            self.providers[ModelProvider.OLLAMA] = OllamaProvider(ollama_url)
-            logger.info(f"Initialized Ollama provider at {ollama_url}")
-        except Exception as e:
-            logger.warning(f"Failed to initialize Ollama provider: {e}")
+        ollama_url = os.getenv("OLLAMA_URL")
+        if ollama_url and ollama_url.strip():
+            try:
+                self.providers[ModelProvider.OLLAMA] = OllamaProvider(ollama_url)
+                logger.info(f"Initialized Ollama provider at {ollama_url}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Ollama provider: {e}")
+        else:
+            logger.warning("OLLAMA_URL not found or empty, Ollama provider not initialized")
         
         # Initialize Zhipu AI provider
         zhipu_api_key = os.getenv("ZHIPUAI_API_KEY")
