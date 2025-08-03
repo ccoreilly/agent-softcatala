@@ -1,3 +1,4 @@
+# Minimal requirements for CI testing
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
@@ -8,18 +9,15 @@ requests==2.31.0
 aiofiles==23.2.1
 python-dotenv==1.0.0
 
-# LangChain dependencies (using more stable versions)
-langchain==0.2.16
-langchain-core==0.2.34
-langchain-community==0.2.16
+# Essential LangChain core (minimal subset)
+langchain-core==0.3.0
 
 # Zhipu AI dependencies
 httpx-sse==0.4.0
 PyJWT==2.8.0
 
-# Additional LangChain tools  
+# Basic tools
 pypdf==3.17.0
-# chromadb==0.4.15  # Commented out due to heavy dependencies, can be added back if needed
 
 # Telegram bot dependency
 python-telegram-bot==21.0.1
