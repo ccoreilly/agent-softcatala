@@ -34,7 +34,7 @@ app.add_middleware(
 )
 
 # Initialize agent with tools
-# Agent type can be: "softcatala_english" (default), "softcatala_catalan", or "generic"
+# Agent type can be: "softcatala_english" (default) or "softcatala_catalan"
 agent_type = os.getenv("AGENT_TYPE", "softcatala_english")
 logger.info(f"Initializing agent with type: {agent_type}")
 

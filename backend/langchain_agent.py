@@ -40,7 +40,7 @@ class LangChainAgent:
         
         Args:
             tools: List of tools to be used by the agent
-            agent_type: Type of agent - "softcatala_english" (default), "softcatala_catalan", or "generic"
+            agent_type: Type of agent - "softcatala_english" (default) or "softcatala_catalan"
         """
         self.model_manager = ModelManager()
         self.tools = self._wrap_tools(tools or [])
@@ -128,33 +128,15 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
 
-    def _get_generic_prompt(self):
-        """Get the generic AI assistant prompt."""
-        return ChatPromptTemplate.from_messages([
-            ("system", """You are a helpful AI assistant. You have access to the following tools:
-{tools}
 
-Use tools when necessary to provide accurate and helpful responses. Always explain your reasoning and provide context for your answers.
-
-Tool descriptions:
-{tool_names}
-"""),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ])
 
     def _setup_agent(self):
         """Setup the LangChain agent with tools and prompts."""
         # Select prompt based on agent type
-        if self.agent_type == "softcatala_english":
-            prompt = self._get_softcatala_english_prompt()
-        elif self.agent_type == "softcatala_catalan":
+        if self.agent_type == "softcatala_catalan":
             prompt = self._get_softcatala_catalan_prompt()
-        elif self.agent_type == "generic":
-            prompt = self._get_generic_prompt()
         else:
-            # Default to Softcatalà English prompt
+            # Default to Softcatalà English prompt (includes softcatala_english and any unknown types)
             prompt = self._get_softcatala_english_prompt()
         
         try:
@@ -332,14 +314,10 @@ Tool descriptions:
             new_model = self.model_manager.get_model(provider, model_name, **kwargs)
             
             # Recreate the agent with the new model using the same prompt selection logic
-            if self.agent_type == "softcatala_english":
-                prompt = self._get_softcatala_english_prompt()
-            elif self.agent_type == "softcatala_catalan":
+            if self.agent_type == "softcatala_catalan":
                 prompt = self._get_softcatala_catalan_prompt()
-            elif self.agent_type == "generic":
-                prompt = self._get_generic_prompt()
             else:
-                # Default to Softcatalà English prompt
+                # Default to Softcatalà English prompt (includes softcatala_english and any unknown types)
                 prompt = self._get_softcatala_english_prompt()
             
             if self.tools:

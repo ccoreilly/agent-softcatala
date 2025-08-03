@@ -70,7 +70,7 @@ OLLAMA_URL=http://ollama:11434      # Ollama service URL
 CORS_ORIGINS=http://localhost:3000  # Allowed origins
 
 # Agent Configuration
-AGENT_TYPE=softcatala_english       # Agent type: softcatala_english (default), softcatala_catalan, or generic
+AGENT_TYPE=softcatala_english       # Agent type: softcatala_english (default) or softcatala_catalan
 
 # Production (for Traefik)
 # TRAEFIK_HOST=your-domain.com
@@ -78,7 +78,7 @@ AGENT_TYPE=softcatala_english       # Agent type: softcatala_english (default), 
 
 ### Agent Types
 
-The system supports three different agent types that can be configured using the `AGENT_TYPE` environment variable:
+The system supports two different Softcatalà agent types that can be configured using the `AGENT_TYPE` environment variable:
 
 #### 🏴‍☠️ softcatala_english (Default)
 - **System Prompt**: English (for better LLM performance)
@@ -92,12 +92,6 @@ The system supports three different agent types that can be configured using the
 - **Purpose**: Fully Catalan Softcatalà assistant 
 - **Best For**: Testing prompt effectiveness in Catalan vs English
 
-#### 🤖 generic
-- **System Prompt**: English
-- **Response Language**: Any language
-- **Purpose**: Standard AI assistant without Softcatalà-specific features
-- **Best For**: General purpose AI assistance
-
 **Usage Examples:**
 ```bash
 # Use default Softcatalà agent (English prompt, Catalan responses)
@@ -105,9 +99,6 @@ AGENT_TYPE=softcatala_english
 
 # Use fully Catalan Softcatalà agent
 AGENT_TYPE=softcatala_catalan
-
-# Use generic AI assistant
-AGENT_TYPE=generic
 ```
 
 ### Available Models
