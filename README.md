@@ -28,7 +28,15 @@ A modern web-based chat application that allows you to interact with AI agents p
 ```bash
 git clone <your-repo>
 cd chat-agent
+
+# Option 1: Create .env file (recommended for development)
 cp .env.example .env
+# Edit .env with your configuration
+
+# Option 2: Use environment variables directly (recommended for production)
+export OLLAMA_URL=http://ollama:11434
+# OR
+export ZHIPUAI_API_KEY=your_zhipu_api_key
 ```
 
 ### 2. Start Services
@@ -61,7 +69,19 @@ Open your browser and go to http://localhost:3000
 
 ### Environment Variables
 
-Edit `.env` to configure your setup:
+You can configure the application using environment variables directly or with a `.env` file. At minimum, you need **one** of the following LLM providers:
+
+#### Required (at least one):
+```bash
+# For local Ollama instance
+OLLAMA_URL=http://ollama:11434
+
+# OR for Zhipu AI cloud service
+ZHIPUAI_API_KEY=your_zhipu_api_key
+```
+
+#### Optional configuration:
+Edit `.env` to configure additional options:
 
 ```bash
 # LLM Model Configuration
