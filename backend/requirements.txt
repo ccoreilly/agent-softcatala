@@ -8,10 +8,10 @@ requests==2.31.0
 aiofiles==23.2.1
 python-dotenv==1.0.0
 
-# LangChain dependencies (using more stable versions)
-langchain==0.2.16
-langchain-core==0.2.34
-langchain-community==0.2.16
+# LangChain dependencies (using compatible versions)
+langchain>=0.2.16,<0.3.0
+langchain-core>=0.2.38,<0.3.0
+langchain-community>=0.2.16,<0.3.0
 
 # Zhipu AI dependencies
 httpx-sse==0.4.0
