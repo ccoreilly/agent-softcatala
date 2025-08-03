@@ -8,19 +8,18 @@ requests==2.31.0
 aiofiles==23.2.1
 python-dotenv==1.0.0
 
-# LangChain dependencies
-langchain==0.3.0
-langchain-core==0.3.0
-langchain-community==0.3.0
-langchain-ollama==0.2.0
+# LangChain dependencies (using compatible versions)
+langchain>=0.2.16,<0.3.0
+langchain-core>=0.2.38,<0.3.0
+langchain-community>=0.2.16,<0.3.0
 
 # Zhipu AI dependencies
 httpx-sse==0.4.0
 PyJWT==2.8.0
 
-# Additional LangChain tools
+# Additional LangChain tools  
 pypdf==3.17.0
-chromadb==0.4.15
+# chromadb==0.4.15  # Commented out due to heavy dependencies, can be added back if needed
 
 # Telegram bot dependency
 python-telegram-bot==21.0.1

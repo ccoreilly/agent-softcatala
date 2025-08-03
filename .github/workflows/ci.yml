@@ -35,3 +35,42 @@ jobs:
       run: |
         cd frontend
         npm run build
+
+  build-backend:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        python -m pip install wheel
+        python -m pip install -r requirements-minimal.txt
+        python -m pip install -r requirements-dev.txt
+        
+    - name: Lint with flake8
+      run: |
+        cd backend
+        # Stop the build if there are Python syntax errors or undefined names
+        python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv,.venv,__pycache__
+        # Exit-zero treats all errors as warnings
+        python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv,.venv,__pycache__
+        
+    - name: Run tests
+      run: |
+        cd backend
+        python -m pytest tests/test_minimal.py tests/test_basic.py tests/test_realistic.py -v --cov=. --cov-report=term-missing
+        
+    # Docker build test temporarily disabled - can be re-enabled later
+    # - name: Test Docker build
+    #   run: |
+    #     cd backend
+    #     docker build -t backend-test .
