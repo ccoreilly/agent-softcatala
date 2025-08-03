@@ -43,6 +43,8 @@ class TelegramBot:
         self.active_chats: Dict[str, bool] = {}
         # Track last message content to prevent duplicate edits
         self.last_message_content: Dict[str, str] = {}
+        # Track debug mode for each chat
+        self.debug_mode: Dict[str, bool] = {}
     
     def setup_handlers(self) -> None:
         """Set up command and message handlers."""
@@ -55,6 +57,7 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("clear", self.clear_command))
         self.application.add_handler(CommandHandler("history", self.history_command))
         self.application.add_handler(CommandHandler("status", self.status_command))
+        self.application.add_handler(CommandHandler("debug", self.debug_command))
         
         # Message handler for regular text messages
         self.application.add_handler(
@@ -78,7 +81,8 @@ class TelegramBot:
             "/help - Mostra aquest missatge d'ajuda\n"
             "/clear - Esborra l'historial de conversa\n"
             "/history - Mostra estadístiques de conversa\n"
-            "/status - Comprova l'estat del bot i l'IA\n\n"
+            "/status - Comprova l'estat del bot i l'IA\n"
+            "/debug - Activa/desactiva el mode debug\n\n"
             "Simplement envia'm un missatge i l'Agent de Softcatalà farà el seu millor per ajudar-te! 🚀"
         )
         
@@ -94,7 +98,8 @@ class TelegramBot:
             "/help - Mostra aquest missatge d'ajuda\n"
             "/clear - Esborra el teu historial de conversa\n"
             "/history - Mostra estadístiques de conversa\n"
-            "/status - Comprova l'estat del bot i el model d'IA\n\n"
+            "/status - Comprova l'estat del bot i el model d'IA\n"
+            "/debug - Activa/desactiva el mode debug detallat\n\n"
             "*Com utilitzar-lo:*\n"
             "Simplement envia qualsevol missatge i l'Agent de Softcatalà respondrà utilitzant capacitats d'IA avançades.\n"
             "L'Agent pot navegar per la web, cercar a Wikipedia, respondre preguntes, ajudar amb codi, i més!\n\n"
@@ -177,6 +182,35 @@ class TelegramBot:
             logger.error(f"Error in status command: {e}")
         
         await update.message.reply_text(status_message, parse_mode=ParseMode.MARKDOWN)
+    
+    async def debug_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /debug command to toggle debug mode."""
+        chat_id = str(update.effective_chat.id)
+        
+        # Toggle debug mode for this chat
+        current_debug = self.debug_mode.get(chat_id, False)
+        new_debug = not current_debug
+        self.debug_mode[chat_id] = new_debug
+        
+        if new_debug:
+            debug_message = (
+                "🐛 *Mode Debug Activat*\n\n"
+                "Ara mostraré informació detallada sobre:\n"
+                "• Crides d'eines i paràmetres\n"
+                "• Detalls de peticions HTTP\n"
+                "• Estats de resposta i errors\n"
+                "• Temps d'execució\n\n"
+                "Utilitza `/debug` de nou per desactivar-ho."
+            )
+        else:
+            debug_message = (
+                "🐛 *Mode Debug Desactivat*\n\n"
+                "Ja no mostraré informació detallada de debug.\n"
+                "Utilitza `/debug` per activar-ho de nou."
+            )
+        
+        await update.message.reply_text(debug_message, parse_mode=ParseMode.MARKDOWN)
+        logger.info(f"Debug mode {'enabled' if new_debug else 'disabled'} for chat {chat_id}")
     
     async def safe_edit_message(self, message, new_content: str, parse_mode=None, message_key: str = None) -> bool:
         """
@@ -298,27 +332,114 @@ class TelegramBot:
                     
                     elif chunk_type == "tool_call":
                         tool_name = chunk.get("tool", "unknown")
+                        parameters = chunk.get("parameters", {})
+                        timestamp = chunk.get("timestamp", "")
                         message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                        
+                        # Check if debug mode is enabled for this chat
+                        debug_enabled = self.debug_mode.get(chat_id, False)
+                        
+                        if debug_enabled:
+                            # Create detailed tool call message
+                            tool_msg = f"🔧 **Utilitzant eina:** `{tool_name}`\n"
+                            if parameters:
+                                tool_msg += f"📋 **Paràmetres:** `{str(parameters)[:100]}{'...' if len(str(parameters)) > 100 else ''}`\n"
+                            tool_msg += f"⏰ **Hora:** {timestamp}\n"
+                            tool_msg += "⏳ Executant..."
+                        else:
+                            # Simple tool call message
+                            tool_msg = f"🔧 Utilitzant eina: {tool_name}..."
+                        
                         await self.safe_edit_message(
                             thinking_msg,
-                            f"🔧 Utilitzant eina: {tool_name}...",
+                            tool_msg,
+                            parse_mode=ParseMode.MARKDOWN if debug_enabled else None,
                             message_key=message_key
                         )
                     
                     elif chunk_type == "tool_result":
+                        tool_name = chunk.get("tool", "unknown")
+                        result = chunk.get("result", {})
+                        timestamp = chunk.get("timestamp", "")
                         message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                        
+                        # Check if debug mode is enabled for this chat
+                        debug_enabled = self.debug_mode.get(chat_id, False)
+                        
+                        if debug_enabled:
+                            # Create detailed tool result message
+                            result_msg = f"✅ **Eina completada:** `{tool_name}`\n"
+                            result_msg += f"⏰ **Hora:** {timestamp}\n"
+                            
+                            # Show HTTP details if available (for web browser tool)
+                            if isinstance(result, dict) and "http_details" in result:
+                                http_details = result["http_details"]
+                                result_msg += f"🌐 **HTTP Status:** {http_details.get('status_code', 'N/A')}\n"
+                                result_msg += f"📄 **Content Type:** `{http_details.get('content_type', 'N/A')}`\n"
+                                result_msg += f"📏 **Content Length:** {http_details.get('content_length', 'N/A')} bytes\n"
+                            
+                            # Show result status
+                            if isinstance(result, dict):
+                                status = result.get("status", "unknown")
+                                if status == "success":
+                                    result_msg += "✅ **Status:** Èxit\n"
+                                elif status == "error":
+                                    result_msg += "❌ **Status:** Error\n"
+                                    if "error" in result:
+                                        result_msg += f"⚠️ **Error:** `{result['error'][:100]}{'...' if len(result.get('error', '')) > 100 else ''}`\n"
+                            
+                            result_msg += "🤔 Processant resultats..."
+                        else:
+                            # Simple tool result message
+                            result_msg = "🤔 Processant resultats d'eines..."
+                        
                         await self.safe_edit_message(
                             thinking_msg,
-                            "🤔 Processant resultats d'eines...",
+                            result_msg,
+                            parse_mode=ParseMode.MARKDOWN if debug_enabled else None,
+                            message_key=message_key
+                        )
+                    
+                    elif chunk_type == "tool_error":
+                        tool_name = chunk.get("tool", "unknown")
+                        error_msg = chunk.get("error", "Error desconegut")
+                        timestamp = chunk.get("timestamp", "")
+                        message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                        
+                        # Check if debug mode is enabled for this chat
+                        debug_enabled = self.debug_mode.get(chat_id, False)
+                        
+                        if debug_enabled:
+                            # Create detailed tool error message
+                            tool_error_msg = f"❌ **Error d'eina:** `{tool_name}`\n"
+                            tool_error_msg += f"⏰ **Hora:** {timestamp}\n"
+                            tool_error_msg += f"⚠️ **Error:** `{error_msg[:200]}{'...' if len(error_msg) > 200 else ''}`\n"
+                            tool_error_msg += "🔄 Continuant sense aquesta eina..."
+                        else:
+                            # Simple tool error message
+                            tool_error_msg = f"❌ Error amb eina {tool_name}. Continuant..."
+                        
+                        await self.safe_edit_message(
+                            thinking_msg,
+                            tool_error_msg,
+                            parse_mode=ParseMode.MARKDOWN if debug_enabled else None,
                             message_key=message_key
                         )
                     
                     elif chunk_type == "error":
                         error_msg = chunk.get("error", "Error desconegut")
+                        timestamp = chunk.get("timestamp", "")
                         message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                        
+                        # Create detailed general error message
+                        general_error_msg = f"❌ **Error general:**\n"
+                        general_error_msg += f"⏰ **Hora:** {timestamp}\n"
+                        general_error_msg += f"⚠️ **Detalls:** `{error_msg[:200]}{'...' if len(error_msg) > 200 else ''}`"
+                        
                         await self.safe_edit_message(
                             thinking_msg,
-                            f"❌ Error: {error_msg}",
+                            general_error_msg,
+                            parse_mode=ParseMode.MARKDOWN,
                             message_key=message_key
                         )
                         return

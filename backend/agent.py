@@ -1,9 +1,13 @@
 import httpx
 import json
+import logging
 from typing import List, Dict, Any, AsyncGenerator, Optional
 from datetime import datetime
 
 from tools.base import BaseTool
+
+# Setup logging for debugging
+logger = logging.getLogger(__name__)
 
 
 class Agent:
@@ -93,12 +97,18 @@ class Agent:
             if ollama_tools:
                 payload["tools"] = ollama_tools
             
+            # Log the request for debugging
+            logger.info(f"Making Ollama request to {self.ollama_url}/api/chat")
+            logger.debug(f"Request payload: {json.dumps(payload, indent=2)}")
+            
             # Make request to Ollama
             async with self.client.stream(
                 "POST",
                 f"{self.ollama_url}/api/chat",
                 json=payload
             ) as response:
+                logger.debug(f"Ollama response status: {response.status_code}")
+                logger.debug(f"Ollama response headers: {dict(response.headers)}")
                 response.raise_for_status()
                 
                 async for line in response.aiter_lines():
@@ -137,7 +147,9 @@ class Agent:
                                                 
                                                 # Execute the tool
                                                 try:
+                                                    logger.info(f"Executing tool: {tool_name} with parameters: {arguments}")
                                                     result = await self._execute_tool(tool_name, arguments)
+                                                    logger.info(f"Tool {tool_name} completed successfully")
                                                     yield {
                                                         "type": "tool_result",
                                                         "tool": tool_name,
@@ -169,11 +181,15 @@ class Agent:
                                                     if ollama_tools:
                                                         follow_up_payload["tools"] = ollama_tools
                                                     
+                                                    logger.debug(f"Making follow-up request after tool execution")
+                                                    logger.debug(f"Follow-up payload: {json.dumps(follow_up_payload, indent=2)}")
+                                                    
                                                     async with self.client.stream(
                                                         "POST",
                                                         f"{self.ollama_url}/api/chat",
                                                         json=follow_up_payload
                                                     ) as follow_response:
+                                                        logger.debug(f"Follow-up response status: {follow_response.status_code}")
                                                         follow_response.raise_for_status()
                                                         
                                                         async for follow_line in follow_response.aiter_lines():
@@ -195,6 +211,7 @@ class Agent:
                                                                     continue
                                                 
                                                 except Exception as e:
+                                                    logger.error(f"Tool {tool_name} failed: {str(e)}", exc_info=True)
                                                     yield {
                                                         "type": "tool_error",
                                                         "tool": tool_name,
@@ -210,6 +227,7 @@ class Agent:
                             continue
                 
         except Exception as e:
+            logger.error(f"Error in chat_stream: {str(e)}", exc_info=True)
             yield {
                 "type": "error",
                 "error": str(e),

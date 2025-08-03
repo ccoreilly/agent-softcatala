@@ -1,7 +1,10 @@
 import httpx
+import logging
 from bs4 import BeautifulSoup
 from typing import Dict, Any
 from .base import BaseTool, ToolDefinition, ToolParameter
+
+logger = logging.getLogger(__name__)
 
 class WebBrowserTool(BaseTool):
     """Tool for browsing web pages and extracting content"""
@@ -52,7 +55,17 @@ class WebBrowserTool(BaseTool):
         max_content_length = kwargs.get("max_content_length", 5000)
         
         try:
+            # Log the HTTP request details
+            logger.info(f"Making HTTP request to: {url}")
+            logger.debug(f"Request headers: {dict(self.client.headers)}")
+            
             response = await self.client.get(url)
+            
+            # Log the HTTP response details
+            logger.info(f"HTTP response status: {response.status_code}")
+            logger.debug(f"Response headers: {dict(response.headers)}")
+            logger.debug(f"Response content length: {len(response.content) if response.content else 0}")
+            
             response.raise_for_status()
             
             soup = BeautifulSoup(response.content, 'html.parser')
@@ -78,7 +91,13 @@ class WebBrowserTool(BaseTool):
                 "url": url,
                 "title": title.strip(),
                 "content": content,
-                "status": "success"
+                "status": "success",
+                "http_details": {
+                    "status_code": response.status_code,
+                    "content_type": response.headers.get("content-type", "unknown"),
+                    "content_length": len(response.content) if response.content else 0,
+                    "server": response.headers.get("server", "unknown")
+                }
             }
             
             # Extract links if requested
@@ -94,12 +113,19 @@ class WebBrowserTool(BaseTool):
             return result
             
         except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error for {url}: {e.response.status_code} - {e.response.reason_phrase}")
             return {
                 "url": url,
                 "error": f"HTTP error {e.response.status_code}: {e.response.reason_phrase}",
-                "status": "error"
+                "status": "error",
+                "http_details": {
+                    "status_code": e.response.status_code,
+                    "error_reason": e.response.reason_phrase,
+                    "response_headers": dict(e.response.headers)
+                }
             }
         except Exception as e:
+            logger.error(f"General error for {url}: {str(e)}", exc_info=True)
             return {
                 "url": url,
                 "error": str(e),
