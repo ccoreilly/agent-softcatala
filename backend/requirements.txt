@@ -23,3 +23,7 @@ pypdf==3.17.0
 
 # Telegram bot dependency
 python-telegram-bot==21.0.1
+
+# pip configuration to prefer wheels
+--prefer-binary
+--only-binary=:all:

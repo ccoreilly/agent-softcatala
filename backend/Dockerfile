@@ -1,33 +1,48 @@
+# Use Python 3.11 slim image for better compatibility
 FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Rust prerequisites
 RUN apt-get update && apt-get install -y \
-    curl \
     build-essential \
+    curl \
+    pkg-config \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# Install Rust and Cargo
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Set Cargo environment variables for compatibility
+ENV CARGO_HOME=/tmp/cargo
+ENV RUSTUP_HOME=/tmp/rustup
+
+# Create cargo directory with proper permissions
+RUN mkdir -p /tmp/cargo/registry/cache
+
+# Copy requirements first for better Docker layer caching
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip and install wheel
+RUN pip install --upgrade pip wheel
 
-# Copy the application code
+# Install Python dependencies with specific flags for Rust packages
+RUN pip install --no-cache-dir \
+    --prefer-binary \
+    --force-reinstall \
+    -r requirements.txt
+
+# Copy application code
 COPY . .
 
-# Create a non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
+# Set environment variable for production
+ENV PYTHONPATH=/app
 
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
-
 # Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "main.py"]
