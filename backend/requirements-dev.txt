@@ -1,0 +1,18 @@
+# Testing dependencies
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.25.2  # For async HTTP testing
+
+# Code quality and linting
+flake8==6.1.0
+black==23.11.0
+isort==5.12.0
+
+# FastAPI testing
+fastapi[all]==0.104.1
+
+# Additional testing utilities
+freezegun==1.2.2  # For mocking time/dates
+responses==0.24.1  # For mocking HTTP requests
+factory-boy==3.3.0  # For test data generation
