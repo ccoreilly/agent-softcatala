@@ -1,23 +1,13 @@
-# Minimal requirements for CI testing
+# Minimal requirements for CI testing - only what's needed for imports and basic functionality
 fastapi==0.104.1
-uvicorn[standard]==0.24.0
+uvicorn==0.24.0
 pydantic==2.5.0
 httpx==0.25.2
 python-multipart==0.0.6
-beautifulsoup4==4.12.2
 requests==2.31.0
 aiofiles==23.2.1
 python-dotenv==1.0.0
 
-# Essential LangChain core (minimal subset)
-langchain-core>=0.2.38,<0.3.0
-
-# Zhipu AI dependencies
-httpx-sse==0.4.0
+# Basic dependencies that are imported in code (can be mocked in tests)
+beautifulsoup4==4.12.2
 PyJWT==2.8.0
-
-# Basic tools
-pypdf==3.17.0
-
-# Telegram bot dependency
-python-telegram-bot==21.0.1
