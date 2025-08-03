@@ -35,6 +35,8 @@ jobs:
       run: |
         cd frontend
         npm run build
+      env:
+        REACT_APP_BACKEND_URL: https://agent-softcatala.onrender.com
 
   build-backend:
     runs-on: ubuntu-latest
