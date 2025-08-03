@@ -67,7 +67,7 @@ jobs:
     - name: Run tests
       run: |
         cd backend
-        python -m pytest tests/ -v --cov=. --cov-report=term-missing --cov-exclude=tests/* --cov-exclude=venv/* --cov-exclude=.venv/*
+        python -m pytest tests/ -v --cov=. --cov-report=term-missing
         
     - name: Test Docker build
       run: |
