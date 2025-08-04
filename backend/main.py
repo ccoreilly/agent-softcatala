@@ -10,8 +10,6 @@ import asyncio
 from dotenv import load_dotenv
 
 from langchain_agent import LangChainAgent
-from tools.web_browser import WebBrowserTool
-from tools.langchain_tools import create_search_tool, create_wikipedia_tool
 from tools.catalan_synonyms import CatalanSynonymsTool
 from tools.catalan_spell_checker import CatalanSpellCheckerTool
 
