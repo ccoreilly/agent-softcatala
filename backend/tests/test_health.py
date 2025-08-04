@@ -45,8 +45,8 @@ class TestHealthEndpoint:
                 }
             },
             "tools": {
-                "count": 3,
-                "names": ["web_browser", "search", "wikipedia"],
+                "count": 2,
+                "names": ["catalan_synonyms", "catalan_spell_checker"],
                 "status": "all_available"
             },
             "memory": {
@@ -71,8 +71,8 @@ class TestHealthEndpoint:
         assert len(data["models"]["zhipu"]["available_models"]) > 0
         
         # Check tools
-        assert data["tools"]["count"] == 3
-        assert "web_browser" in data["tools"]["names"]
+        assert data["tools"]["count"] == 2
+        assert "catalan_synonyms" in data["tools"]["names"]
     
     @patch('main.agent')
     def test_health_endpoint_partial_service_failure(self, mock_agent, client):
@@ -94,9 +94,9 @@ class TestHealthEndpoint:
             },
             "tools": {
                 "count": 2,
-                "names": ["search", "wikipedia"],
-                "status": "partial_availability",
-                "failed": ["web_browser"]
+                "names": ["catalan_synonyms", "catalan_spell_checker"],
+                "status": "all_available",
+                "failed": []
             }
         })
         
@@ -108,7 +108,7 @@ class TestHealthEndpoint:
         assert data["models"]["ollama"]["status"] == "unavailable"
         assert data["models"]["zhipu"]["status"] == "available"
         assert data["tools"]["count"] == 2
-        assert "web_browser" in data["tools"]["failed"]
+        assert len(data["tools"]["failed"]) == 0
     
     @patch('main.agent')
     def test_health_endpoint_complete_failure(self, mock_agent, client):
@@ -285,8 +285,8 @@ class TestHealthCheckResilience:
                 "status": "unavailable"
             },
             "tools": {
-                "count": 3,
-                "names": ["web_browser", "search", "wikipedia"],
+                "count": 2,
+                "names": ["catalan_synonyms", "catalan_spell_checker"],
                 "status": "available"
             },
             "partial_failure_reason": "Model providers unreachable"
@@ -317,8 +317,8 @@ class TestHealthCheckResilience:
                 }
             },
             "tools": {
-                "count": 3,
-                "names": ["web_browser", "search", "wikipedia"],
+                "count": 2,
+                "names": ["catalan_synonyms", "catalan_spell_checker"],
                 "status": "available"
             },
             "timeout_components": ["ollama"]

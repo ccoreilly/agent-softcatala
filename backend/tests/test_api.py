@@ -42,8 +42,8 @@ def mock_agent():
             }
         },
         "tools": {
-            "count": 3,
-            "names": ["web_browser", "search", "wikipedia"]
+            "count": 2,
+            "names": ["catalan_synonyms", "catalan_spell_checker"]
         }
     })
     
@@ -204,11 +204,10 @@ class TestToolsEndpoint:
         assert response.status_code == 200
         
         data = response.json()
-        assert data["count"] == 3
-        assert len(data["tools"]) == 3
-        assert "web_browser" in data["tools"]
-        assert "search" in data["tools"] 
-        assert "wikipedia" in data["tools"]
+        assert data["count"] == 2
+        assert len(data["tools"]) == 2
+        assert "catalan_synonyms" in data["tools"]
+        assert "catalan_spell_checker" in data["tools"]
         assert data["status"] == "disponible"
     
     @patch('main.agent')

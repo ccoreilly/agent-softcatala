@@ -16,7 +16,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Imports now work thanks to our comprehensive mocking system in conftest.py
 from langchain_agent import LangChainAgent
-from tools.web_browser import WebBrowserTool
+from tools.catalan_synonyms import CatalanSynonymsTool
+from tools.catalan_spell_checker import CatalanSpellCheckerTool
 
 
 class TestLangChainAgent:
@@ -25,15 +26,13 @@ class TestLangChainAgent:
     @pytest.fixture
     def mock_tools(self):
         """Create mock tools for testing."""
-        web_tool = MagicMock(spec=WebBrowserTool)
-        search_tool = MagicMock()
-        wikipedia_tool = MagicMock()
+        synonyms_tool = MagicMock(spec=CatalanSynonymsTool)
+        spell_checker_tool = MagicMock(spec=CatalanSpellCheckerTool)
         
-        web_tool.name = "web_browser"
-        search_tool.name = "search"
-        wikipedia_tool.name = "wikipedia"
+        synonyms_tool.name = "catalan_synonyms"
+        spell_checker_tool.name = "catalan_spell_checker"
         
-        return [web_tool, search_tool, wikipedia_tool]
+        return [synonyms_tool, spell_checker_tool]
     
     def test_agent_initialization(self, mock_tools):
         """Test agent initializes correctly with tools."""
@@ -69,8 +68,8 @@ class TestLangChainAgent:
                     "zhipu": {"status": "available", "available_models": ["glm-4"]}
                 },
                 "tools": {
-                    "count": 3,
-                    "names": ["web_browser", "search", "wikipedia"]
+                    "count": 2,
+                    "names": ["catalan_synonyms", "catalan_spell_checker"]
                 }
             })
             mock_agent_class.return_value = mock_agent
@@ -197,47 +196,37 @@ class TestModelProviders:
 class TestToolsIntegration:
     """Test tools integration and functionality."""
     
-    def test_web_browser_tool_initialization(self):
-        """Test web browser tool initializes correctly."""
+    def test_catalan_synonyms_tool_initialization(self):
+        """Test Catalan synonyms tool initializes correctly."""
         # Mock the tool since we don't want to make actual web requests
-        with patch('tools.web_browser.WebBrowserTool') as mock_tool:
+        with patch('tools.catalan_synonyms.CatalanSynonymsTool') as mock_tool:
             mock_instance = MagicMock()
-            mock_instance.name = "web_browser"
+            mock_instance.name = "catalan_synonyms"
             mock_tool.return_value = mock_instance
             
             tool = mock_tool()
-            assert tool.name == "web_browser"
+            assert tool.name == "catalan_synonyms"
     
-    def test_search_tool_creation(self):
-        """Test search tool creation."""
-        with patch('tools.langchain_tools.create_search_tool') as mock_create:
-            mock_tool = MagicMock()
-            mock_tool.name = "search"
-            mock_create.return_value = mock_tool
+    def test_catalan_spell_checker_tool_initialization(self):
+        """Test Catalan spell checker tool initializes correctly."""
+        with patch('tools.catalan_spell_checker.CatalanSpellCheckerTool') as mock_tool:
+            mock_instance = MagicMock()
+            mock_instance.name = "catalan_spell_checker"
+            mock_tool.return_value = mock_instance
             
-            tool = mock_create()
-            assert tool.name == "search"
-    
-    def test_wikipedia_tool_creation(self):
-        """Test Wikipedia tool creation."""
-        with patch('tools.langchain_tools.create_wikipedia_tool') as mock_create:
-            mock_tool = MagicMock()
-            mock_tool.name = "wikipedia"
-            mock_create.return_value = mock_tool
-            
-            tool = mock_create()
-            assert tool.name == "wikipedia"
+            tool = mock_tool()
+            assert tool.name == "catalan_spell_checker"
     
     @pytest.mark.asyncio
     async def test_tools_in_agent_execution(self):
         """Test that tools are properly integrated in agent execution."""
         # Create mock tools
-        web_tool = MagicMock()
-        web_tool.name = "web_browser"
-        search_tool = MagicMock()
-        search_tool.name = "search"
+        synonyms_tool = MagicMock()
+        synonyms_tool.name = "catalan_synonyms"
+        spell_checker_tool = MagicMock()
+        spell_checker_tool.name = "catalan_spell_checker"
         
-        tools = [web_tool, search_tool]
+        tools = [synonyms_tool, spell_checker_tool]
         
         with patch('langchain_agent.LangChainAgent') as mock_agent_class:
             mock_agent = MagicMock()
@@ -246,8 +235,8 @@ class TestToolsIntegration:
             
             agent = mock_agent_class(tools=tools)
             assert len(agent.tools) == 2
-            assert any(tool.name == "web_browser" for tool in agent.tools)
-            assert any(tool.name == "search" for tool in agent.tools)
+            assert any(tool.name == "catalan_synonyms" for tool in agent.tools)
+            assert any(tool.name == "catalan_spell_checker" for tool in agent.tools)
 
 
 class TestMessageHistory:
@@ -348,7 +337,7 @@ class TestErrorHandling:
                     "ollama": {"status": "unavailable", "error": "Connection failed"},
                     "zhipu": {"status": "available", "available_models": ["glm-4"]}
                 },
-                "tools": {"count": 2, "names": ["search", "wikipedia"]}
+                "tools": {"count": 2, "names": ["catalan_synonyms", "catalan_spell_checker"]}
             }
             
             agent = LangChainAgent(tools=[])

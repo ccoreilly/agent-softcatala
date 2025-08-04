@@ -109,18 +109,3 @@ class LangChainToolWrapper(BaseTool):
         )
 
 
-# Additional LangChain tools that can be imported directly
-from langchain_community.tools import DuckDuckGoSearchRun
-from langchain_community.tools import WikipediaQueryRun
-from langchain_community.utilities import WikipediaAPIWrapper
-
-
-def create_search_tool():
-    """Create a DuckDuckGo search tool."""
-    return DuckDuckGoSearchRun()
-
-
-def create_wikipedia_tool():
-    """Create a Wikipedia search tool."""
-    wikipedia = WikipediaAPIWrapper()
-    return WikipediaQueryRun(api_wrapper=wikipedia)

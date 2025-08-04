@@ -77,8 +77,8 @@ def test_mock_fastapi_app(mock_fastapi_app):
 
 def test_tools_import():
     """Test that tools can be imported."""
-    from tools.web_browser import WebBrowserTool
+    from tools.catalan_synonyms import CatalanSynonymsTool
     
     # Should be mocked but importable
-    tool = WebBrowserTool()
+    tool = CatalanSynonymsTool()
     assert tool is not None
