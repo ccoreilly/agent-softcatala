@@ -332,7 +332,7 @@ class TelegramBot:
                     
                     elif chunk_type == "tool_call":
                         tool_name = chunk.get("tool", "unknown")
-                        parameters = chunk.get("parameters", {})
+                        tool_input = chunk.get("input", {})
                         timestamp = chunk.get("timestamp", "")
                         message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
                         
@@ -341,11 +341,22 @@ class TelegramBot:
                         
                         if debug_enabled:
                             # Create detailed tool call message
-                            tool_msg = f"🔧 **Utilitzant eina:** `{tool_name}`\n"
-                            if parameters:
-                                tool_msg += f"📋 **Paràmetres:** `{str(parameters)[:100]}{'...' if len(str(parameters)) > 100 else ''}`\n"
+                            tool_msg = f"🔧 **Eina seleccionada:** `{tool_name}`\n"
                             tool_msg += f"⏰ **Hora:** {timestamp}\n"
-                            tool_msg += "⏳ Executant..."
+                            
+                            # Format tool parameters in a readable way
+                            if tool_input:
+                                tool_msg += f"📋 **Paràmetres:**\n"
+                                for key, value in tool_input.items():
+                                    # Truncate long values
+                                    value_str = str(value)
+                                    if len(value_str) > 50:
+                                        value_str = value_str[:47] + "..."
+                                    tool_msg += f"   • `{key}`: `{value_str}`\n"
+                            else:
+                                tool_msg += f"📋 **Paràmetres:** Cap\n"
+                            
+                            tool_msg += "⏳ **Estat:** Executant eina..."
                         else:
                             # Simple tool call message
                             tool_msg = f"🔧 Utilitzant eina: {tool_name}..."
@@ -360,6 +371,7 @@ class TelegramBot:
                     elif chunk_type == "tool_result":
                         tool_name = chunk.get("tool", "unknown")
                         result = chunk.get("result", {})
+                        tool_input = chunk.get("input", {})
                         timestamp = chunk.get("timestamp", "")
                         message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
                         
@@ -371,24 +383,61 @@ class TelegramBot:
                             result_msg = f"✅ **Eina completada:** `{tool_name}`\n"
                             result_msg += f"⏰ **Hora:** {timestamp}\n"
                             
-                            # Show HTTP details if available (for web browser tool)
-                            if isinstance(result, dict) and "http_details" in result:
-                                http_details = result["http_details"]
-                                result_msg += f"🌐 **HTTP Status:** {http_details.get('status_code', 'N/A')}\n"
-                                result_msg += f"📄 **Content Type:** `{http_details.get('content_type', 'N/A')}`\n"
-                                result_msg += f"📏 **Content Length:** {http_details.get('content_length', 'N/A')} bytes\n"
+                            # Show input parameters that were used
+                            if tool_input:
+                                result_msg += f"📥 **Paràmetres utilitzats:**\n"
+                                for key, value in tool_input.items():
+                                    value_str = str(value)
+                                    if len(value_str) > 30:
+                                        value_str = value_str[:27] + "..."
+                                    result_msg += f"   • `{key}`: `{value_str}`\n"
                             
-                            # Show result status
+                            # Show result status and content
                             if isinstance(result, dict):
                                 status = result.get("status", "unknown")
                                 if status == "success":
-                                    result_msg += "✅ **Status:** Èxit\n"
+                                    result_msg += "✅ **Estat:** Èxit\n"
+                                    
+                                    # Show specific result details based on tool
+                                    if tool_name == "catalan_synonyms":
+                                        results_data = result.get("results", [])
+                                        if results_data:
+                                            synonym_count = sum(len(r.get("synonyms", [])) for r in results_data)
+                                            result_msg += f"📊 **Resultats:** {len(results_data)} entrades, {synonym_count} grups de sinònims\n"
+                                        word = result.get("word", "")
+                                        if word:
+                                            result_msg += f"🔍 **Paraula cercada:** `{word}`\n"
+                                    elif tool_name == "catalan_spell_checker":
+                                        corrections = result.get("corrections", [])
+                                        if corrections:
+                                            result_msg += f"📝 **Correccions:** {len(corrections)} suggeriments\n"
+                                    else:
+                                        # Generic result info
+                                        result_keys = [k for k in result.keys() if k not in ["status", "timestamp"]]
+                                        if result_keys:
+                                            result_msg += f"📤 **Claus de resposta:** {', '.join(result_keys[:3])}\n"
+                                        
                                 elif status == "error":
-                                    result_msg += "❌ **Status:** Error\n"
+                                    result_msg += "❌ **Estat:** Error\n"
                                     if "error" in result:
-                                        result_msg += f"⚠️ **Error:** `{result['error'][:100]}{'...' if len(result.get('error', '')) > 100 else ''}`\n"
+                                        error_text = result["error"]
+                                        if len(error_text) > 100:
+                                            error_text = error_text[:97] + "..."
+                                        result_msg += f"⚠️ **Error:** `{error_text}`\n"
+                                elif status == "not_found":
+                                    result_msg += "🔍 **Estat:** No trobat\n"
+                                    if "message" in result:
+                                        result_msg += f"💬 **Missatge:** {result['message']}\n"
+                                else:
+                                    result_msg += f"📊 **Estat:** `{status}`\n"
+                            else:
+                                # Non-dict result
+                                result_str = str(result)
+                                if len(result_str) > 150:
+                                    result_str = result_str[:147] + "..."
+                                result_msg += f"📤 **Resposta:** `{result_str}`\n"
                             
-                            result_msg += "🤔 Processant resultats..."
+                            result_msg += "🤔 **Estat:** Processant resultats..."
                         else:
                             # Simple tool result message
                             result_msg = "🤔 Processant resultats d'eines..."

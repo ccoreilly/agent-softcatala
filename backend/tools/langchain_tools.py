@@ -58,11 +58,44 @@ class LangChainToolWrapper(BaseTool):
             # Execute the custom tool
             result = await self.custom_tool.execute(**kwargs)
             
-            return result
+            # Ensure the result indicates success/failure for agent processing
+            if isinstance(result, dict):
+                # If tool returned an error status, we should raise an exception
+                # so the agent knows the tool failed
+                if result.get("status") == "error":
+                    error_msg = result.get("error", "Tool execution failed")
+                    raise Exception(f"Tool {self.name} failed: {error_msg}")
+                
+                # For successful results, return as-is
+                return result
+            else:
+                # For non-dict results, wrap in a structured response
+                return {
+                    "result": result,
+                    "status": "success",
+                    "tool": self.name
+                }
+            
         except Exception as e:
+            error_details = {
+                "error": str(e),
+                "status": "error",
+                "tool": self.name,
+                "parameters": kwargs
+            }
+            
+            # Log the error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Tool {self.name} execution failed: {e}")
+            
+            # Notify the callback manager if available
             if run_manager:
                 await run_manager.on_tool_error(e)
-            raise
+            
+            # Return structured error response instead of raising
+            # This allows the agent to continue processing with error information
+            return error_details
     
     @property
     def args_schema(self) -> Optional[Type[BaseModel]]:

@@ -205,16 +205,34 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             
             if hasattr(self.agent_executor, 'astream'):
                 # Stream with agent executor
-                async for chunk in self.agent_executor.astream(agent_input, config=config):
-                    yield await self._process_agent_chunk(chunk)
+                try:
+                    async for chunk in self.agent_executor.astream(agent_input, config=config):
+                        processed_chunk = await self._process_agent_chunk(chunk)
+                        if processed_chunk:
+                            yield processed_chunk
+                except Exception as stream_error:
+                    logger.error(f"Error during agent streaming: {stream_error}")
+                    yield {
+                        "type": "error",
+                        "error": f"Streaming error: {str(stream_error)}",
+                        "timestamp": datetime.now().isoformat()
+                    }
             else:
                 # Fallback to regular invoke
-                response = await self.agent_executor.ainvoke(agent_input, config=config)
-                yield {
-                    "type": "content",
-                    "content": response.get("output", str(response)),
-                    "timestamp": datetime.now().isoformat()
-                }
+                try:
+                    response = await self.agent_executor.ainvoke(agent_input, config=config)
+                    yield {
+                        "type": "content",
+                        "content": response.get("output", str(response)),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                except Exception as invoke_error:
+                    logger.error(f"Error during agent invoke: {invoke_error}")
+                    yield {
+                        "type": "error",
+                        "error": f"Agent execution error: {str(invoke_error)}",
+                        "timestamp": datetime.now().isoformat()
+                    }
                 
         except Exception as e:
             logger.error(f"Error in chat_stream: {e}")
@@ -231,6 +249,9 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
     
     async def _process_agent_chunk(self, chunk: Dict[str, Any]) -> Dict[str, Any]:
         """Process a chunk from the agent executor."""
+        # Log the chunk for debugging
+        logger.debug(f"Processing agent chunk: {chunk}")
+        
         # Handle different types of chunks from LangChain agent
         if "output" in chunk:
             return {
@@ -244,20 +265,80 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             for step in steps:
                 if len(step) >= 2:
                     action, observation = step[0], step[1]
+                    # Emit tool result with tool name and result
                     return {
-                        "type": "tool_call",
+                        "type": "tool_result",
                         "tool": action.tool,
                         "input": action.tool_input,
-                        "output": observation,
+                        "result": observation,
                         "timestamp": datetime.now().isoformat()
                     }
+        elif "actions" in chunk:
+            # Handle tool selection/calling phase
+            actions = chunk["actions"]
+            for action in actions:
+                return {
+                    "type": "tool_call",
+                    "tool": action.tool,
+                    "input": action.tool_input,
+                    "timestamp": datetime.now().isoformat()
+                }
         
-        # Default case
-        return {
-            "type": "content",
-            "content": str(chunk),
-            "timestamp": datetime.now().isoformat()
-        }
+        # Handle LangChain agent step types
+        if isinstance(chunk, dict):
+            # Check for agent-related keys that indicate tool usage
+            chunk_keys = set(chunk.keys())
+            
+            # Look for LangChain agent step patterns
+            if "agent" in chunk_keys:
+                agent_data = chunk["agent"]
+                if isinstance(agent_data, dict) and "tool_calls" in str(agent_data):
+                    return {
+                        "type": "tool_call",
+                        "tool": str(agent_data.get("tool", "unknown")),
+                        "input": agent_data.get("tool_input", {}),
+                        "timestamp": datetime.now().isoformat()
+                    }
+            
+            # Check for step-based execution
+            if "steps" in chunk_keys:
+                steps = chunk["steps"]
+                if isinstance(steps, list) and steps:
+                    last_step = steps[-1]
+                    if isinstance(last_step, dict) and "action" in last_step:
+                        action = last_step["action"]
+                        if hasattr(action, 'tool'):
+                            return {
+                                "type": "tool_call",
+                                "tool": action.tool,
+                                "input": getattr(action, 'tool_input', {}),
+                                "timestamp": datetime.now().isoformat()
+                            }
+            
+            # Look for messages or content
+            if "messages" in chunk_keys:
+                messages = chunk["messages"]
+                if isinstance(messages, list) and messages:
+                    last_msg = messages[-1]
+                    if hasattr(last_msg, 'content'):
+                        return {
+                            "type": "content",
+                            "content": last_msg.content,
+                            "timestamp": datetime.now().isoformat()
+                        }
+        
+        # Default case for any unhandled chunks
+        # Only return content if there's meaningful information
+        chunk_str = str(chunk)
+        if chunk_str and chunk_str not in ["", "{}", "[]", "None"]:
+            return {
+                "type": "content",
+                "content": chunk_str,
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        # Return None for empty/meaningless chunks
+        return None
     
     async def check_health(self) -> Dict[str, Any]:
         """Check the health of the agent and its dependencies."""
