@@ -38,6 +38,29 @@ class CatalanSpellCheckerTool(BaseTool):
             ]
         )
     
+    @property
+    def catalan_definition(self) -> ToolDefinition:
+        """Catalan version of the tool definition for use with Catalan prompts"""
+        return ToolDefinition(
+            name="catalan_spell_checker",
+            description="Comprova textos catalans per detectar errors d'ortografia, gramàtica i estil. Suporta el català central (general), el valencià i el balear. Retorna informació detallada dels errors amb suggeriments de correcció.",
+            parameters=[
+                ToolParameter(
+                    name="text",
+                    type="string",
+                    description="El text català a comprovar per detectar errors d'ortografia i gramàtica",
+                    required=True
+                ),
+                ToolParameter(
+                    name="dialect",
+                    type="string",
+                    description="Dialecte català a utilitzar: 'general' per al dialecte català central, 'valencia' per al valencià, o 'balear' per al balear. Si no s'especifica, l'eina detectarà automàticament el dialecte apropiat.",
+                    required=False,
+                    default="auto"
+                )
+            ]
+        )
+    
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Execute the spell checking"""
         self.validate_parameters(kwargs)

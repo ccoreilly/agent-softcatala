@@ -43,6 +43,35 @@ class CatalanSynonymsTool(BaseTool):
             ]
         )
     
+    @property
+    def catalan_definition(self) -> ToolDefinition:
+        """Catalan version of the tool definition for use with Catalan prompts"""
+        return ToolDefinition(
+            name="catalan_synonyms",
+            description="Cerca sinònims, antònims i paraules relacionades al diccionari de la llengua catalana. Suporta cerca de paraules, autocompletat i consulta d'índex de paraules.",
+            parameters=[
+                ToolParameter(
+                    name="action",
+                    type="string",
+                    description="Acció a realitzar: 'search' (obtenir sinònims d'una paraula), 'autocomplete' (obtenir suggeriments de paraules), o 'index' (obtenir paraules que comencen amb un prefix)",
+                    required=True
+                ),
+                ToolParameter(
+                    name="word",
+                    type="string", 
+                    description="La paraula catalana per la qual cercar sinònims, suggeriments d'autocompletat, o usar com a prefix per a la consulta d'índex",
+                    required=True
+                ),
+                ToolParameter(
+                    name="max_results",
+                    type="integer",
+                    description="Nombre màxim de resultats a retornar per a les operacions d'autocompletat i índex",
+                    required=False,
+                    default=10
+                )
+            ]
+        )
+    
     async def execute(self, **kwargs) -> Dict[str, Any]:
         """Execute the synonyms search"""
         self.validate_parameters(kwargs)

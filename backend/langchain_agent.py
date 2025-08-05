@@ -44,18 +44,20 @@ class LangChainAgent:
             agent_type: Type of agent - "softcatala_english" (default) or "softcatala_catalan"
         """
         self.model_manager = ModelManager()
-        self.tools = self._wrap_tools(tools or [])
-        self.agent_executor = None
         self.agent_type = agent_type
+        # Use Catalan tool descriptions if using Catalan prompt
+        use_catalan_tools = (agent_type == "softcatala_catalan")
+        self.tools = self._wrap_tools(tools or [], use_catalan=use_catalan_tools)
+        self.agent_executor = None
         self._setup_agent()
     
-    def _wrap_tools(self, tools: List) -> List[BaseTool]:
+    def _wrap_tools(self, tools: List, use_catalan: bool = False) -> List[BaseTool]:
         """Wrap existing tools for LangChain compatibility."""
         wrapped_tools = []
         for tool in tools:
             if hasattr(tool, 'definition'):
-                # Wrap existing tool
-                wrapped_tool = LangChainToolWrapper(tool)
+                # Wrap existing tool with language preference
+                wrapped_tool = LangChainToolWrapper(tool, use_catalan=use_catalan)
                 wrapped_tools.append(wrapped_tool)
                 logger.info(f"Wrapped tool: {wrapped_tool.name} - {wrapped_tool.description}")
                 logger.debug(f"Tool schema: {wrapped_tool.args_schema}")
@@ -67,6 +69,42 @@ class LangChainAgent:
         logger.info(f"Total tools wrapped: {len(wrapped_tools)}")
         return wrapped_tools
     
+    def _detect_english_content(self, text: str) -> bool:
+        """Simple heuristic to detect if text contains significant English content."""
+        if not text:
+            return False
+        
+        # Common English words that shouldn't appear in Catalan responses
+        english_indicators = [
+            'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+            'from', 'about', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
+            'up', 'down', 'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once',
+            'here', 'there', 'when', 'where', 'why', 'how', 'all', 'any', 'both', 'each',
+            'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only',
+            'own', 'same', 'so', 'than', 'too', 'very', 'can', 'will', 'just', 'should',
+            'now', 'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we',
+            'they', 'them', 'their', 'what', 'which', 'who', 'when', 'where', 'why', 'how'
+        ]
+        
+        # Convert to lowercase and split into words
+        words = text.lower().split()
+        english_word_count = sum(1 for word in words if word.strip('.,!?;:') in english_indicators)
+        
+        # If more than 20% of words are English indicators, flag as English
+        total_words = len(words)
+        if total_words == 0:
+            return False
+        
+        english_ratio = english_word_count / total_words
+        return english_ratio > 0.2
+    
+    def _add_language_reminder(self, text: str) -> str:
+        """Add a language reminder if English content is detected."""
+        if self.agent_type == "softcatala_catalan" and self._detect_english_content(text):
+            reminder = "\n\n[RECORDATORI: La resposta hauria de ser completament en català. Si us plau, reformula en català.]"
+            return text + reminder
+        return text
+    
     def _get_softcatala_english_prompt(self):
         """Get the Softcatalà agent prompt in English (for better LLM performance)."""
         return ChatPromptTemplate.from_messages([
@@ -74,7 +112,7 @@ class LangChainAgent:
 
 You are a helpful AI Assistant from the Softcatalà non-profit association. Softcatalà has over 25 years of experience working to provide tools to navigate and experience information technologies in the Catalan language.
 
-**Critical Requirement:** You will ONLY interact with users in Catalan language and will never resort to a different language. All your responses must be in Catalan.
+**CRITICAL AND ABSOLUTE REQUIREMENT:** You will ONLY interact with users in Catalan language and will NEVER, under any circumstances, resort to English or any other language. ALL your responses must be 100% in Catalan. This includes explanations, error messages, tool descriptions, and any other content you generate. If you are uncertain about a Catalan term, you must still attempt to express it in Catalan rather than falling back to English.
 
 ## Your Main Task
 
@@ -84,7 +122,9 @@ Your main task is assistance in using technologies for translating and correctin
 
 ## Available Tools
 
-You have access to various tools that will be automatically available when needed. Use tools when necessary to provide accurate and helpful responses. Always explain your reasoning and provide context for your answers. Remember to respond in Catalan.
+You have access to various tools that will be automatically available when needed. Use tools when necessary to provide accurate and helpful responses. Always explain your reasoning and provide context for your answers. 
+
+**LANGUAGE REMINDER:** EVERY word of your response must be in Catalan. Do not mix languages. Do not use English technical terms when Catalan equivalents exist. Always respond in Catalan, no exceptions.
 
 ## How to Collaborate with Softcatalà
 
@@ -100,9 +140,11 @@ If a user asks how they can collaborate with Softcatalà, tell them the best way
         return ChatPromptTemplate.from_messages([
             ("system", """# Assistent d'IA de Softcatalà
 
-Ets un assistent d'intel·ligència artificial útil de l'associació sense ànim de lucre Softcatalà. Softcatalà té més de 25 anys d'experiència treballant per proporcionar eines per navegar i experimentar les tecnologies de la informació en llengua catalana. 
+Ets un assistent d'intel·ligència artificial útil de l'associació sense ànim de lucre Softcatalà. Softcatalà té més de 25 anys d'experiència treballant per proporcionar eines per navegar i experimentar les tecnologies de la informació en llengua catalana.
 
-**Important:** Només interactuaràs amb els usuaris en llengua catalana i mai no recorreràs a una llengua diferent.
+**NORMA FONAMENTAL I INQUEBRANTABLE:** SEMPRE i EN TOTES LES CIRCUMSTÀNCIES respondràs EXCLUSIVAMENT en llengua catalana. MAI utilitzaràs cap altra llengua, especialment l'anglès. Si no saps com expressar alguna cosa en català, ho has d'intentar igualment sense recórrer a cap altra llengua.
+
+**RECORDATORI CONSTANT:** Cada resposta que donis ha de ser al 100% en català. Això inclou totes les explicacions, descripcions d'eines, missatges d'error, i qualsevol altre contingut que generes.
 
 ## La teva tasca principal
 
@@ -112,11 +154,21 @@ La teva tasca principal és l'assistència en l'ús de tecnologies per traduir i
 
 ## Eines disponibles
 
-Tens accés a diverses eines que estaran disponibles automàticament quan sigui necessari. Utilitza aquestes eines quan sigui necessari per proporcionar respostes precises i útils. Explica sempre el teu raonament i proporciona context per a les teves respostes.
+Tens accés a diverses eines que estaran disponibles automàticament quan sigui necessari. Utilitza aquestes eines quan sigui necessari per proporcionar respostes precises i útils. Explica sempre el teu raonament i proporciona context per a les teves respostes. SEMPRE en català.
+
+## Instruccions de comportament lingüístic
+
+1. **Llengua única:** Utilitza EXCLUSIVAMENT el català en totes les teves respostes
+2. **No mesclis idiomes:** Mai combinis català amb anglès o altres llengües
+3. **Terminologia tècnica:** Usa sempre els termes tècnics en català quan existeixin
+4. **Explicacions:** Totes les explicacions sobre l'ús d'eines han de ser en català
+5. **Missatges del sistema:** Fins i tot els missatges tècnics han de ser en català
 
 ## Com col·laborar amb Softcatalà
 
 Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la millor manera és fomentar l'ús de la llengua catalana quan s'utilitzen tecnologies de la informació. Han de canviar l'idioma de tots els seus dispositius al català i, si no és possible, sol·licitar la localització als fabricants via xarxes socials. Han d'animar amics i familiars a fer el mateix.
+
+**RECORDATORI FINAL:** Respon SEMPRE en català, sense excepció.
 """),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
@@ -261,9 +313,11 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                     
                     response = await self.hybrid_caller.call_with_tools(langchain_messages)
                     
+                    # Apply language checking for Catalan agent
+                    content = self._add_language_reminder(response.content)
                     yield {
                         "type": "content",
-                        "content": response.content,
+                        "content": content,
                         "timestamp": datetime.now().isoformat()
                     }
                     return
@@ -303,9 +357,11 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                 # Fallback to regular invoke
                 try:
                     response = await self.agent_executor.ainvoke(agent_input, config=config)
+                    # Apply language checking for Catalan agent
+                    content = self._add_language_reminder(response.get("output", str(response)))
                     yield {
                         "type": "content",
-                        "content": response.get("output", str(response)),
+                        "content": content,
                         "timestamp": datetime.now().isoformat()
                     }
                 except Exception as invoke_error:
@@ -338,9 +394,11 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
         # Handle different types of chunks from LangChain agent
         if "output" in chunk:
             logger.info(f"Found output chunk: {chunk['output']}")
+            # Apply language checking for Catalan agent
+            content = self._add_language_reminder(chunk["output"])
             return {
                 "type": "content",
-                "content": chunk["output"],
+                "content": content,
                 "timestamp": datetime.now().isoformat()
             }
         elif "intermediate_steps" in chunk:
