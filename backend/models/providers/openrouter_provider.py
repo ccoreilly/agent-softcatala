@@ -78,6 +78,7 @@ class OpenRouterProvider(BaseProvider):
         # Return a curated list of popular OpenRouter models
         # In a production environment, you might want to fetch this from OpenRouter's API
         return [
+            "google/gemma-3-27b-it:free",
             "anthropic/claude-3-5-sonnet",
             "anthropic/claude-3-haiku",
             "openai/gpt-4o",
@@ -102,9 +103,9 @@ class OpenRouterProvider(BaseProvider):
         """Get the default OpenRouter model.
         
         Returns:
-            ChatOpenAI instance with anthropic/claude-3-5-sonnet as default model
+            ChatOpenAI instance with google/gemma-3-27b-it:free as default model
         """
-        return self.get_model("anthropic/claude-3-5-sonnet")
+        return self.get_model("google/gemma-3-27b-it:free")
     
     async def health_check(self) -> Dict[str, Any]:
         """Check OpenRouter API health.
@@ -122,7 +123,7 @@ class OpenRouterProvider(BaseProvider):
             return {
                 "status": "healthy",
                 "provider": "openrouter",
-                "default_model": "anthropic/claude-3-5-sonnet",
+                "default_model": "google/gemma-3-27b-it:free",
                 "api_key_configured": bool(self.api_key),
                 "base_url": self.base_url,
                 "available_models_count": len(self.list_models()),
