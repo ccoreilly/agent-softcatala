@@ -8,7 +8,7 @@ import logging
 from langchain_core.language_models.base import BaseLanguageModel
 from langchain_core.language_models.chat_models import BaseChatModel
 
-from .providers import OllamaProvider, ZhipuProvider, OpenAIProvider
+from .providers import OllamaProvider, ZhipuProvider, OpenAIProvider, OpenRouterProvider
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ class ModelProvider(str, Enum):
     OLLAMA = "ollama"
     ZHIPU = "zhipu"
     OPENAI = "openai"
+    OPENROUTER = "openrouter"
 
 
 class ModelManager:
