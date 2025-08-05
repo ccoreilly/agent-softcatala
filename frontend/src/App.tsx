@@ -11,7 +11,7 @@ import './App.css';
 function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime> }) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
   // Load sessions from storage
   useEffect(() => {
@@ -40,8 +40,8 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
     setSessions(prev => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
     
-    // Clear the current conversation in the runtime
-    runtime.switchToNewThread();
+    // Note: assistant-ui runtime doesn't have switchToNewThread method
+    // The Thread component will automatically handle new conversations
   };
 
   const handleDeleteSession = (sessionId: string) => {
@@ -53,7 +53,6 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
         setCurrentSessionId(remainingSessions[0].id);
       } else {
         setCurrentSessionId(null);
-        runtime.switchToNewThread();
       }
     }
   };
@@ -62,7 +61,6 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
     setCurrentSessionId(sessionId);
     // Note: In a full implementation, you'd want to restore the conversation history
     // This would require additional assistant-ui API calls
-    runtime.switchToNewThread();
   };
 
   const handleRenameSession = (sessionId: string, newName: string) => {
@@ -83,21 +81,19 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
     <div className={cn("h-screen flex bg-white text-gray-900")}>
       {/* Sidebar */}
       <div className={cn(
-        "transition-all duration-300 border-r border-gray-200 bg-gray-50",
-        sidebarCollapsed ? "w-0" : "w-64"
+        "transition-all duration-300 overflow-hidden",
+        sidebarCollapsed ? "w-0" : "w-80"
       )}>
-        {!sidebarCollapsed && (
-          <Sidebar
-            sessions={sessions}
-            currentSessionId={currentSessionId}
-            onNewSession={handleNewSession}
-            onSelectSession={handleSessionSelect}
-            onDeleteSession={handleDeleteSession}
-            onRenameSession={handleRenameSession}
-            isCollapsed={sidebarCollapsed}
-            onToggleCollapse={handleToggleCollapse}
-          />
-        )}
+        <Sidebar
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          onNewSession={handleNewSession}
+          onSelectSession={handleSessionSelect}
+          onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+        />
       </div>
 
       {/* Main Content */}
