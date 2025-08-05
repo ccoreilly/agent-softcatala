@@ -212,9 +212,127 @@ class TelegramBot:
         await update.message.reply_text(debug_message, parse_mode=ParseMode.MARKDOWN)
         logger.info(f"Debug mode {'enabled' if new_debug else 'disabled'} for chat {chat_id}")
     
+    def _escape_markdown_v2(self, text: str) -> str:
+        """
+        Escape special characters for Telegram MarkdownV2.
+        
+        Args:
+            text: Text to escape
+            
+        Returns:
+            Escaped text safe for MarkdownV2
+        """
+        # Characters that need escaping in MarkdownV2
+        escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        escaped_text = text
+        for char in escape_chars:
+            escaped_text = escaped_text.replace(char, f'\\{char}')
+        return escaped_text
+    
+    def _truncate_message(self, content: str, max_length: int = 4000) -> tuple[str, bool]:
+        """
+        Truncate message content to fit within Telegram's limits.
+        
+        Args:
+            content: Original message content
+            max_length: Maximum allowed length (default 4000 to leave room for formatting)
+            
+        Returns:
+            Tuple of (truncated_content, was_truncated)
+        """
+        if len(content) <= max_length:
+            return content, False
+        
+        # Try to truncate at a word boundary
+        truncated = content[:max_length]
+        last_space = truncated.rfind(' ')
+        if last_space > max_length * 0.8:  # Only use word boundary if it's not too far back
+            truncated = truncated[:last_space]
+        
+        truncated += "...\n\n⚠️ *Missatge truncat - massa llarg per mostrar completament*"
+        return truncated, True
+    
+    async def _send_split_message(self, chat_id: int, content: str, parse_mode=None) -> list:
+        """
+        Send a long message by splitting it into multiple parts.
+        
+        Args:
+            chat_id: Chat ID to send messages to
+            content: Content to send
+            parse_mode: Telegram parse mode
+            
+        Returns:
+            List of sent message objects
+        """
+        max_length = 4000  # Leave room for formatting
+        messages = []
+        
+        if len(content) <= max_length:
+            # Single message
+            try:
+                msg = await self.bot.send_message(
+                    chat_id=chat_id,
+                    text=content,
+                    parse_mode=parse_mode
+                )
+                messages.append(msg)
+            except Exception as e:
+                # Fallback without parse_mode
+                msg = await self.bot.send_message(
+                    chat_id=chat_id,
+                    text=content
+                )
+                messages.append(msg)
+        else:
+            # Split into multiple messages
+            parts = []
+            current_part = ""
+            lines = content.split('\n')
+            
+            for line in lines:
+                if len(current_part + line + '\n') <= max_length:
+                    current_part += line + '\n'
+                else:
+                    if current_part:
+                        parts.append(current_part.rstrip())
+                        current_part = line + '\n'
+                    else:
+                        # Single line is too long, force split
+                        while len(line) > max_length:
+                            parts.append(line[:max_length])
+                            line = line[max_length:]
+                        current_part = line + '\n'
+            
+            if current_part:
+                parts.append(current_part.rstrip())
+            
+            # Send each part
+            for i, part in enumerate(parts):
+                part_prefix = f"[{i+1}/{len(parts)}] " if len(parts) > 1 else ""
+                try:
+                    msg = await self.bot.send_message(
+                        chat_id=chat_id,
+                        text=part_prefix + part,
+                        parse_mode=parse_mode
+                    )
+                    messages.append(msg)
+                except Exception as e:
+                    # Fallback without parse_mode
+                    msg = await self.bot.send_message(
+                        chat_id=chat_id,
+                        text=part_prefix + part
+                    )
+                    messages.append(msg)
+                    
+                # Small delay between messages to avoid rate limiting
+                if i < len(parts) - 1:
+                    await asyncio.sleep(0.1)
+        
+        return messages
+
     async def safe_edit_message(self, message, new_content: str, parse_mode=None, message_key: str = None) -> bool:
         """
-        Safely edit a message, avoiding duplicate content errors.
+        Safely edit a message, handling errors and falling back to new messages when needed.
         
         Args:
             message: The message object to edit
@@ -223,7 +341,7 @@ class TelegramBot:
             message_key: Unique key to track this message's content
         
         Returns:
-            bool: True if message was edited successfully, False if skipped or failed
+            bool: True if message was edited or sent successfully, False if skipped
         """
         if message_key is None:
             message_key = f"{message.chat_id}_{message.message_id}"
@@ -233,23 +351,75 @@ class TelegramBot:
             if self.last_message_content[message_key] == new_content:
                 return False  # Skip editing, content is the same
         
+        # Truncate message if too long
+        truncated_content, was_truncated = self._truncate_message(new_content)
+        
         try:
+            # Try to edit the existing message
             if parse_mode:
-                await message.edit_text(new_content, parse_mode=parse_mode)
+                await message.edit_text(truncated_content, parse_mode=parse_mode)
             else:
-                await message.edit_text(new_content)
+                await message.edit_text(truncated_content)
             
             # Track the new content
             self.last_message_content[message_key] = new_content
             return True
             
         except Exception as e:
+            error_str = str(e).lower()
+            
             # Check if it's the "not modified" error specifically
-            if "Message is not modified" in str(e):
+            if "message is not modified" in error_str:
                 logger.debug(f"Message content unchanged, skipping edit: {message_key}")
                 return False
+            
+            # Handle specific Telegram API errors
+            elif "can't parse entities" in error_str or "bad request" in error_str:
+                logger.warning(f"Markdown parsing error for message {message_key}, trying without parse_mode: {e}")
+                try:
+                    # Retry without parse_mode
+                    await message.edit_text(truncated_content)
+                    self.last_message_content[message_key] = new_content
+                    return True
+                except Exception as e2:
+                    logger.warning(f"Failed to edit message {message_key} even without parse_mode: {e2}")
+                    return await self._fallback_to_new_message(message.chat_id, new_content, parse_mode)
+            
+            elif "message_too_long" in error_str or "message is too long" in error_str:
+                logger.warning(f"Message too long for edit {message_key}, sending as new message(s)")
+                return await self._fallback_to_new_message(message.chat_id, new_content, parse_mode)
+            
             else:
                 logger.warning(f"Failed to edit message {message_key}: {e}")
+                return await self._fallback_to_new_message(message.chat_id, new_content, parse_mode)
+    
+    async def _fallback_to_new_message(self, chat_id: int, content: str, parse_mode=None) -> bool:
+        """
+        Fallback method to send content as new message(s) when editing fails.
+        
+        Args:
+            chat_id: Chat ID to send to
+            content: Content to send
+            parse_mode: Telegram parse mode
+            
+        Returns:
+            bool: True if messages were sent successfully
+        """
+        try:
+            messages = await self._send_split_message(chat_id, content, parse_mode)
+            logger.info(f"Sent {len(messages)} fallback message(s) to chat {chat_id}")
+            return len(messages) > 0
+        except Exception as e:
+            logger.error(f"Failed to send fallback message to chat {chat_id}: {e}")
+            try:
+                # Last resort: send simple text message
+                await self.bot.send_message(
+                    chat_id=chat_id,
+                    text="❌ Ho sento, hi ha hagut un problema mostrant la resposta completa."
+                )
+                return True
+            except Exception as e2:
+                logger.error(f"Failed to send error message to chat {chat_id}: {e2}")
                 return False
     
     def cleanup_old_message_tracking(self, max_entries: int = 1000) -> None:
