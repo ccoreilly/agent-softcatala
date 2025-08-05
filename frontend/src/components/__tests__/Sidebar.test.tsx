@@ -119,7 +119,7 @@ describe('Sidebar Component', () => {
       const sessionItem = screen.getByText('Session 1').closest('.session-item')!;
       await user.hover(sessionItem);
       
-      const editButton = within(sessionItem).getByTitle('Canviar nom de la sessió');
+      const editButton = within(sessionItem as HTMLElement).getByTitle('Canviar nom de la sessió');
       await user.click(editButton);
       
       expect(screen.getByDisplayValue('Session 1')).toBeInTheDocument();
@@ -132,7 +132,7 @@ describe('Sidebar Component', () => {
       const sessionItem = screen.getByText('Session 1').closest('.session-item')!;
       await user.hover(sessionItem);
       
-      const editButton = within(sessionItem).getByTitle('Canviar nom de la sessió');
+      const editButton = within(sessionItem as HTMLElement).getByTitle('Canviar nom de la sessió');
       await user.click(editButton);
       
       const input = screen.getByDisplayValue('Session 1');
@@ -150,7 +150,7 @@ describe('Sidebar Component', () => {
       const sessionItem = screen.getByText('Session 1').closest('.session-item')!;
       await user.hover(sessionItem);
       
-      const editButton = within(sessionItem).getByTitle('Canviar nom de la sessió');
+      const editButton = within(sessionItem as HTMLElement).getByTitle('Canviar nom de la sessió');
       await user.click(editButton);
       
       const input = screen.getByDisplayValue('Session 1');
@@ -169,7 +169,7 @@ describe('Sidebar Component', () => {
       const sessionItem = screen.getByText('Session 1').closest('.session-item')!;
       await user.hover(sessionItem);
       
-      const editButton = within(sessionItem).getByTitle('Canviar nom de la sessió');
+      const editButton = within(sessionItem as HTMLElement).getByTitle('Canviar nom de la sessió');
       await user.click(editButton);
       
       const input = screen.getByDisplayValue('Session 1');
@@ -194,7 +194,7 @@ describe('Sidebar Component', () => {
       const sessionItem = screen.getByText('Session 1').closest('.session-item')!;
       await user.hover(sessionItem);
       
-      const deleteButton = within(sessionItem).getByTitle('Eliminar sessió');
+      const deleteButton = within(sessionItem as HTMLElement).getByTitle('Eliminar sessió');
       await user.click(deleteButton);
       
       expect(confirmSpy).toHaveBeenCalledWith('Estàs segur que vols eliminar "Session 1"?');
@@ -213,7 +213,7 @@ describe('Sidebar Component', () => {
       const sessionItem = screen.getByText('Session 1').closest('.session-item')!;
       await user.hover(sessionItem);
       
-      const deleteButton = within(sessionItem).getByTitle('Eliminar sessió');
+      const deleteButton = within(sessionItem as HTMLElement).getByTitle('Eliminar sessió');
       await user.click(deleteButton);
       
       expect(confirmSpy).toHaveBeenCalled();
@@ -254,7 +254,7 @@ describe('Sidebar Component', () => {
       const sessionItem = screen.getByText('Session 1').closest('.session-item')!;
       await user.hover(sessionItem);
       
-      const editButton = within(sessionItem).getByTitle('Canviar nom de la sessió');
+      const editButton = within(sessionItem as HTMLElement).getByTitle('Canviar nom de la sessió');
       await user.click(editButton);
       
       // Session should not be selected when clicking action buttons
@@ -283,7 +283,7 @@ describe('Sidebar Component', () => {
       const sessionItem = screen.getByText('Session 1').closest('.session-item')!;
       await user.hover(sessionItem);
       
-      const editButton = within(sessionItem).getByTitle('Canviar nom de la sessió');
+      const editButton = within(sessionItem as HTMLElement).getByTitle('Canviar nom de la sessió');
       await user.click(editButton);
       
       const input = screen.getByDisplayValue('Session 1');
