@@ -10,40 +10,61 @@ from backend.models.model_manager import ModelManager, ModelProvider
 
 
 async def test_zai_integration():
-    """Test Z.AI integration with the new configuration."""
-    print("Testing Z.AI Integration...")
+    """Test provider integration."""
+    print("Testing Provider Integration...")
     print("=" * 50)
     
-    # Check environment variables
-    api_key = os.getenv("ZHIPUAI_API_KEY")
-    base_url = os.getenv("ZHIPUAI_BASE_URL")
+    # Check environment variables for all providers
+    zhipu_key = os.getenv("ZHIPUAI_API_KEY")
+    zhipu_base_url = os.getenv("ZHIPUAI_BASE_URL")
+    openai_key = os.getenv("OPENAI_KEY")
+    ollama_url = os.getenv("OLLAMA_URL")
     
-    print(f"API Key: {'✓' if api_key else '✗'} {'(set)' if api_key else '(not set)'}")
-    print(f"Base URL: {base_url or 'default'}")
+    print("Provider Configuration:")
+    print(f"  Zhipu AI: {'✓' if zhipu_key else '✗'} {'(set)' if zhipu_key else '(not set)'}")
+    print(f"  OpenAI: {'✓' if openai_key else '✗'} {'(set)' if openai_key else '(not set)'}")
+    print(f"  Ollama: {'✓' if ollama_url else '✗'} {'(set)' if ollama_url else '(not set)'}")
     print()
     
-    if not api_key:
-        print("❌ ZHIPUAI_API_KEY environment variable not set!")
-        print("Please set your Z.AI API key:")
-        print("export ZHIPUAI_API_KEY=your_api_key")
+    if not zhipu_key and not openai_key and not ollama_url:
+        print("❌ No provider configuration found!")
+        print("Please set at least one provider:")
+        print("  - export ZHIPUAI_API_KEY=your_zhipu_key (for Zhipu AI)")
+        print("  - export OPENAI_KEY=your_openai_key (for OpenAI)")
+        print("  - export OLLAMA_URL=http://localhost:11434 (for Ollama)")
         return False
     
     try:
         # Initialize model manager
         manager = ModelManager()
         
-        # Check if Zhipu provider is available
-        if ModelProvider.ZHIPU not in manager.providers:
-            print("❌ Z.AI/Zhipu provider not initialized!")
+        # Check if any provider is available
+        available_providers = list(manager.providers.keys())
+        if not available_providers:
+            print("❌ No providers initialized!")
             return False
         
-        provider = manager.providers[ModelProvider.ZHIPU]
-        print("✓ Z.AI/Zhipu provider initialized")
+        print(f"✓ Available providers: {', '.join([p.value for p in available_providers])}")
+        
+        # Prefer OpenAI if available, then Zhipu
+        if ModelProvider.OPENAI in manager.providers:
+            provider = manager.providers[ModelProvider.OPENAI]
+            print("✓ Using OpenAI provider")
+            test_model = "gpt-4.1-mini"
+            test_message = "Say 'Hello from OpenAI GPT-4.1-mini!' in response."
+        elif ModelProvider.ZHIPU not in manager.providers:
+            print("❌ Z.AI/Zhipu provider not initialized!")
+            return False
+        else:
+            provider = manager.providers[ModelProvider.ZHIPU]
+            print("✓ Using Z.AI/Zhipu provider")
+            test_model = "glm-4.5-flash"
+            test_message = "Say 'Hello from Z.AI GLM-4.5-flash!' in response."
         
         # List available models
         models = provider.list_models()
         print(f"✓ Available models: {len(models)} models")
-        print(f"  - Default model: GLM-4.5-flash")
+        print(f"  - Default model: {test_model}")
         print(f"  - Available: {', '.join(models[:5])}{'...' if len(models) > 5 else ''}")
         print()
         
@@ -65,14 +86,14 @@ async def test_zai_integration():
         
         # Test model creation
         print("Testing model creation...")
-        model = provider.get_model("glm-4.5-flash", temperature=0.7)
-        print("✓ GLM-4.5-flash model created successfully")
+        model = provider.get_model(test_model, temperature=0.7)
+        print(f"✓ {test_model} model created successfully")
         
         # Test simple completion
-        print("\nTesting chat completion with GLM-4.5-flash...")
+        print(f"\nTesting chat completion with {test_model}...")
         from langchain_core.messages import HumanMessage
         
-        messages = [HumanMessage(content="Say 'Hello from Z.AI GLM-4.5-flash!' in response.")]
+        messages = [HumanMessage(content=test_message)]
         
         try:
             response = await model.agenerate([messages])
@@ -87,9 +108,9 @@ async def test_zai_integration():
             return False
         
         print("\n" + "=" * 50)
-        print("🎉 Z.AI integration test completed successfully!")
-        print("✓ GLM-4.5-flash is now the default model")
-        print("✓ Z.AI endpoint configuration working")
+        print("🎉 Provider integration test completed successfully!")
+        print(f"✓ {test_model} is working correctly")
+        print("✓ Provider configuration working")
         print("✓ All functionality verified")
         
         return True
@@ -103,22 +124,25 @@ async def test_zai_integration():
 
 def main():
     """Main test function."""
-    print("Z.AI Integration Test")
-    print("Checking GLM-4.5-flash model and endpoint configuration...")
+    print("Provider Integration Test")
+    print("Checking available language model providers...")
     print()
     
     success = asyncio.run(test_zai_integration())
     
     if success:
-        print("\n🚀 Ready to use Z.AI with GLM-4.5-flash!")
+        print("\n🚀 Ready to use the configured language model provider!")
         sys.exit(0)
     else:
         print("\n💡 Setup instructions:")
-        print("1. Get your API key from Z.AI platform (open.bigmodel.cn)")
-        print("2. Set environment variable:")
+        print("Configure at least one provider:")
+        print("1. For Z.AI/Zhipu: Get API key from open.bigmodel.cn")
         print("   export ZHIPUAI_API_KEY=your_api_key")
-        print("3. Run this test again")
-        print("Note: Z.AI and Zhipu AI use the same API endpoint - no additional configuration needed!")
+        print("2. For OpenAI: Get API key from platform.openai.com")
+        print("   export OPENAI_KEY=your_api_key")
+        print("3. For Ollama: Install locally and set URL")
+        print("   export OLLAMA_URL=http://localhost:11434")
+        print("4. Run this test again")
         sys.exit(1)
 
 

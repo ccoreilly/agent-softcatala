@@ -8,7 +8,7 @@ import logging
 from langchain_core.language_models.base import BaseLanguageModel
 from langchain_core.language_models.chat_models import BaseChatModel
 
-from .providers import OllamaProvider, ZhipuProvider
+from .providers import OllamaProvider, ZhipuProvider, OpenAIProvider
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,7 @@ class ModelProvider(str, Enum):
     """Supported model providers."""
     OLLAMA = "ollama"
     ZHIPU = "zhipu"
+    OPENAI = "openai"
 
 
 class ModelManager:
@@ -56,6 +57,23 @@ class ModelManager:
                 logger.warning(f"Failed to initialize Zhipu AI provider: {e}")
         else:
             logger.warning("ZHIPUAI_API_KEY not found, Zhipu AI provider not initialized")
+        
+        # Initialize OpenAI provider
+        openai_api_key = os.getenv("OPENAI_KEY")
+        if openai_api_key:
+            try:
+                # Support custom OpenAI base URL if needed
+                openai_base_url = os.getenv("OPENAI_BASE_URL")
+                if openai_base_url:
+                    self.providers[ModelProvider.OPENAI] = OpenAIProvider(openai_api_key, openai_base_url)
+                    logger.info(f"Initialized OpenAI provider with custom endpoint: {openai_base_url}")
+                else:
+                    self.providers[ModelProvider.OPENAI] = OpenAIProvider(openai_api_key)
+                    logger.info("Initialized OpenAI provider with default endpoint")
+            except Exception as e:
+                logger.warning(f"Failed to initialize OpenAI provider: {e}")
+        else:
+            logger.warning("OPENAI_KEY not found, OpenAI provider not initialized")
     
     def get_model(self, provider: str, model_name: str, **kwargs) -> BaseChatModel:
         """Get a specific model from a provider."""
@@ -85,6 +103,13 @@ class ModelManager:
                 return self.providers[ModelProvider.OLLAMA].get_default_model()
             except Exception as e:
                 logger.warning(f"Failed to get default Ollama model: {e}")
+        
+        # Fall back to OpenAI
+        if ModelProvider.OPENAI in self.providers:
+            try:
+                return self.providers[ModelProvider.OPENAI].get_default_model()
+            except Exception as e:
+                logger.warning(f"Failed to get default OpenAI model: {e}")
         
         # Fall back to Zhipu AI
         if ModelProvider.ZHIPU in self.providers:
