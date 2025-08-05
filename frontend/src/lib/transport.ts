@@ -30,7 +30,7 @@ export class ChatAgentAdapter implements ChatModelAdapter {
   private baseUrl: string;
 
   constructor(baseUrl = process.env.NODE_ENV === 'production' 
-    ? window.location.origin 
+    ? (process.env.REACT_APP_BACKEND_URL || window.location.origin)
     : 'http://localhost:8000') {
     this.baseUrl = baseUrl;
   }

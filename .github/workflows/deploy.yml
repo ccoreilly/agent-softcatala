@@ -37,8 +37,8 @@ jobs:
       run: |
         cd frontend
         npm run build
-      env:
-        REACT_APP_BACKEND_URL: https://agent-softcatala.onrender.com
+              env:
+          REACT_APP_BACKEND_URL: https://agent-softcatala.onrender.com:8000
         
     - name: Setup Pages
       uses: actions/configure-pages@v4
