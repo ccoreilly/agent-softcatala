@@ -16,16 +16,21 @@ class LangChainToolWrapper(BaseTool):
     description: str = Field(description="The description of the tool")
     custom_tool: CustomBaseTool = Field(description="The wrapped custom tool")
     
-    def __init__(self, custom_tool: CustomBaseTool, **kwargs):
+    def __init__(self, custom_tool: CustomBaseTool, use_catalan: bool = False, **kwargs):
         """Initialize the wrapper with a custom tool.
         
         Args:
             custom_tool: The custom tool to wrap
+            use_catalan: Whether to use Catalan tool descriptions
         """
-        tool_def = custom_tool.definition
+        # Use Catalan definition if available and requested
+        if use_catalan and hasattr(custom_tool, 'catalan_definition'):
+            tool_def = custom_tool.catalan_definition
+        else:
+            tool_def = custom_tool.definition
         
         # Generate the schema before calling super()
-        schema = self._generate_args_schema(custom_tool)
+        schema = self._generate_args_schema(custom_tool, use_catalan)
         
         super().__init__(
             name=tool_def.name,
@@ -119,13 +124,17 @@ class LangChainToolWrapper(BaseTool):
             logger.info(f"🔧 Returning error details for {self.name}: {error_details}")
             return error_details
     
-    def _generate_args_schema(self, custom_tool: CustomBaseTool) -> Optional[Type[BaseModel]]:
+    def _generate_args_schema(self, custom_tool: CustomBaseTool, use_catalan: bool = False) -> Optional[Type[BaseModel]]:
         """Generate the arguments schema for the tool during initialization."""
         import logging
         logger = logging.getLogger(__name__)
         
         # Dynamically create a Pydantic model based on tool parameters
-        tool_def = custom_tool.definition
+        # Use Catalan definition if available and requested
+        if use_catalan and hasattr(custom_tool, 'catalan_definition'):
+            tool_def = custom_tool.catalan_definition
+        else:
+            tool_def = custom_tool.definition
         
         if not tool_def.parameters:
             return None
