@@ -54,10 +54,16 @@ class LangChainAgent:
         for tool in tools:
             if hasattr(tool, 'definition'):
                 # Wrap existing tool
-                wrapped_tools.append(LangChainToolWrapper(tool))
+                wrapped_tool = LangChainToolWrapper(tool)
+                wrapped_tools.append(wrapped_tool)
+                logger.info(f"Wrapped tool: {wrapped_tool.name} - {wrapped_tool.description}")
+                logger.debug(f"Tool schema: {wrapped_tool.args_schema}")
             else:
                 # Assume it's already a LangChain tool
                 wrapped_tools.append(tool)
+                logger.info(f"Already LangChain tool: {getattr(tool, 'name', str(tool))}")
+        
+        logger.info(f"Total tools wrapped: {len(wrapped_tools)}")
         return wrapped_tools
     
     def _get_softcatala_english_prompt(self):
@@ -123,17 +129,28 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
         # Select prompt based on agent type
         if self.agent_type == "softcatala_catalan":
             prompt = self._get_softcatala_catalan_prompt()
+            logger.info("Using Catalan prompt")
         else:
             # Default to Softcatalà English prompt (includes softcatala_english and any unknown types)
             prompt = self._get_softcatala_english_prompt()
+            logger.info("Using English prompt")
         
         try:
             # Get the default model
             llm = self.model_manager.get_default_model()
+            logger.info(f"Using LLM: {llm}")
+            logger.info(f"LLM has bind_tools capability: {hasattr(llm, 'bind_tools')}")
             
             # Create agent if we have tools
             if self.tools:
+                logger.info(f"Creating agent with {len(self.tools)} tools:")
+                for tool in self.tools:
+                    logger.info(f"  - {tool.name}: {tool.description}")
+                    logger.debug(f"    Schema: {tool.args_schema}")
+                
                 agent = create_openai_tools_agent(llm, self.tools, prompt)
+                logger.info("OpenAI tools agent created successfully")
+                
                 self.agent_executor = AgentExecutor(
                     agent=agent,
                     tools=self.tools,
@@ -141,12 +158,16 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                     handle_parsing_errors=True,
                     max_iterations=3
                 )
+                logger.info("AgentExecutor created successfully")
+                logger.info(f"Agent executor type: {type(self.agent_executor)}")
             else:
                 # Simple chain without tools
                 self.agent_executor = prompt | llm
+                logger.info("Created simple chain without tools")
                 
         except Exception as e:
             logger.error(f"Failed to setup agent: {e}")
+            logger.exception("Full traceback:")
             raise
     
     async def chat_stream(self, messages: List[Dict], session_id: str) -> AsyncGenerator[Dict[str, Any], None]:
@@ -205,13 +226,27 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             
             if hasattr(self.agent_executor, 'astream'):
                 # Stream with agent executor
+                logger.info("Starting agent streaming...")
+                logger.debug(f"Agent input: {agent_input}")
                 try:
+                    chunk_count = 0
                     async for chunk in self.agent_executor.astream(agent_input, config=config):
+                        chunk_count += 1
+                        logger.debug(f"Received chunk #{chunk_count}: {chunk}")
+                        logger.debug(f"Chunk type: {type(chunk)}")
+                        logger.debug(f"Chunk keys: {list(chunk.keys()) if isinstance(chunk, dict) else 'N/A'}")
+                        
                         processed_chunk = await self._process_agent_chunk(chunk)
                         if processed_chunk:
+                            logger.debug(f"Processed chunk: {processed_chunk}")
                             yield processed_chunk
+                        else:
+                            logger.debug("Chunk processed but no output generated")
+                    
+                    logger.info(f"Agent streaming completed. Total chunks processed: {chunk_count}")
                 except Exception as stream_error:
                     logger.error(f"Error during agent streaming: {stream_error}")
+                    logger.exception("Full streaming error traceback:")
                     yield {
                         "type": "error",
                         "error": f"Streaming error: {str(stream_error)}",
@@ -251,9 +286,11 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
         """Process a chunk from the agent executor."""
         # Log the chunk for debugging
         logger.debug(f"Processing agent chunk: {chunk}")
+        logger.debug(f"Chunk type: {type(chunk)}")
         
         # Handle different types of chunks from LangChain agent
         if "output" in chunk:
+            logger.info(f"Found output chunk: {chunk['output']}")
             return {
                 "type": "content",
                 "content": chunk["output"],
@@ -262,9 +299,12 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
         elif "intermediate_steps" in chunk:
             # Handle tool calls
             steps = chunk["intermediate_steps"]
-            for step in steps:
+            logger.info(f"Found intermediate_steps chunk with {len(steps)} steps")
+            for i, step in enumerate(steps):
+                logger.debug(f"Step {i}: {step}")
                 if len(step) >= 2:
                     action, observation = step[0], step[1]
+                    logger.info(f"Tool execution - Action: {action.tool}, Input: {action.tool_input}, Result: {observation}")
                     # Emit tool result with tool name and result
                     return {
                         "type": "tool_result",
@@ -276,7 +316,9 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
         elif "actions" in chunk:
             # Handle tool selection/calling phase
             actions = chunk["actions"]
+            logger.info(f"Found actions chunk with {len(actions)} actions")
             for action in actions:
+                logger.info(f"Tool call - Tool: {action.tool}, Input: {action.tool_input}")
                 return {
                     "type": "tool_call",
                     "tool": action.tool,
@@ -284,29 +326,63 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                     "timestamp": datetime.now().isoformat()
                 }
         
-        # Handle LangChain agent step types
+        # Handle LangChain agent step types and tool usage
         if isinstance(chunk, dict):
             # Check for agent-related keys that indicate tool usage
             chunk_keys = set(chunk.keys())
+            logger.debug(f"🔧 Chunk keys found: {chunk_keys}")
+            
+            # Check for tool_calls in the chunk (OpenAI tools format)
+            if "tool_calls" in chunk_keys:
+                tool_calls = chunk["tool_calls"]
+                logger.info(f"🔧 Direct tool_calls found: {tool_calls}")
+                if tool_calls and len(tool_calls) > 0:
+                    tool_call = tool_calls[0]  # Take first tool call
+                    return {
+                        "type": "tool_call",
+                        "tool": tool_call.get("function", {}).get("name", "unknown"),
+                        "input": tool_call.get("function", {}).get("arguments", {}),
+                        "timestamp": datetime.now().isoformat()
+                    }
             
             # Look for LangChain agent step patterns
             if "agent" in chunk_keys:
                 agent_data = chunk["agent"]
-                if isinstance(agent_data, dict) and "tool_calls" in str(agent_data):
-                    return {
-                        "type": "tool_call",
-                        "tool": str(agent_data.get("tool", "unknown")),
-                        "input": agent_data.get("tool_input", {}),
-                        "timestamp": datetime.now().isoformat()
-                    }
+                logger.debug(f"🔧 Agent data: {agent_data}")
+                if isinstance(agent_data, dict):
+                    # Check for tool calls in agent data
+                    if "tool_calls" in agent_data:
+                        tool_calls = agent_data["tool_calls"]
+                        logger.info(f"🔧 Tool calls in agent data: {tool_calls}")
+                        if tool_calls and len(tool_calls) > 0:
+                            tool_call = tool_calls[0]
+                            return {
+                                "type": "tool_call",
+                                "tool": tool_call.get("function", {}).get("name", "unknown"),
+                                "input": tool_call.get("function", {}).get("arguments", {}),
+                                "timestamp": datetime.now().isoformat()
+                            }
+                    
+                    # Check for function calls (alternative format)
+                    if "function_call" in agent_data:
+                        function_call = agent_data["function_call"]
+                        logger.info(f"🔧 Function call in agent data: {function_call}")
+                        return {
+                            "type": "tool_call",
+                            "tool": function_call.get("name", "unknown"),
+                            "input": function_call.get("arguments", {}),
+                            "timestamp": datetime.now().isoformat()
+                        }
             
             # Check for step-based execution
             if "steps" in chunk_keys:
                 steps = chunk["steps"]
+                logger.debug(f"🔧 Steps found: {steps}")
                 if isinstance(steps, list) and steps:
                     last_step = steps[-1]
                     if isinstance(last_step, dict) and "action" in last_step:
                         action = last_step["action"]
+                        logger.info(f"🔧 Action in step: {action}")
                         if hasattr(action, 'tool'):
                             return {
                                 "type": "tool_call",
@@ -315,15 +391,35 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                                 "timestamp": datetime.now().isoformat()
                             }
             
-            # Look for messages or content
+            # Look for messages or content with tool information
             if "messages" in chunk_keys:
                 messages = chunk["messages"]
+                logger.debug(f"🔧 Messages found: {messages}")
                 if isinstance(messages, list) and messages:
                     last_msg = messages[-1]
-                    if hasattr(last_msg, 'content'):
+                    logger.debug(f"🔧 Last message: {last_msg}")
+                    
+                    # Check for tool calls in message
+                    if hasattr(last_msg, 'tool_calls') and last_msg.tool_calls:
+                        tool_calls = last_msg.tool_calls
+                        logger.info(f"🔧 Tool calls in message: {tool_calls}")
+                        for tool_call in tool_calls:
+                            return {
+                                "type": "tool_call",
+                                "tool": tool_call.get("name", "unknown"),
+                                "input": tool_call.get("args", {}),
+                                "timestamp": datetime.now().isoformat()
+                            }
+                    
+                    # Regular message content
+                    if hasattr(last_msg, 'content') and last_msg.content:
+                        content = last_msg.content
+                        # Check if content indicates tool usage
+                        if "tool" in content.lower() or "function" in content.lower():
+                            logger.debug(f"🔧 Message content with tool reference: {content}")
                         return {
                             "type": "content",
-                            "content": last_msg.content,
+                            "content": content,
                             "timestamp": datetime.now().isoformat()
                         }
         

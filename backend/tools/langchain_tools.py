@@ -23,10 +23,15 @@ class LangChainToolWrapper(BaseTool):
             custom_tool: The custom tool to wrap
         """
         tool_def = custom_tool.definition
+        
+        # Generate the schema before calling super()
+        schema = self._generate_args_schema(custom_tool)
+        
         super().__init__(
             name=tool_def.name,
             description=tool_def.description,
             custom_tool=custom_tool,
+            args_schema=schema,  # Set the schema explicitly
             **kwargs
         )
     
@@ -51,12 +56,24 @@ class LangChainToolWrapper(BaseTool):
         **kwargs: Any,
     ) -> Any:
         """Run the tool asynchronously."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"🔧 TOOL EXECUTION STARTED: {self.name}")
+        logger.info(f"🔧 Tool parameters: {kwargs}")
+        logger.info(f"🔧 Run manager: {run_manager}")
+        
         try:
             # Validate parameters
+            logger.debug(f"🔧 Validating parameters for {self.name}")
             self.custom_tool.validate_parameters(kwargs)
+            logger.debug(f"🔧 Parameter validation successful for {self.name}")
             
             # Execute the custom tool
+            logger.info(f"🔧 Executing custom tool: {self.name}")
             result = await self.custom_tool.execute(**kwargs)
+            logger.info(f"🔧 Tool execution completed: {self.name}")
+            logger.debug(f"🔧 Raw tool result: {result}")
             
             # Ensure the result indicates success/failure for agent processing
             if isinstance(result, dict):
@@ -64,17 +81,21 @@ class LangChainToolWrapper(BaseTool):
                 # so the agent knows the tool failed
                 if result.get("status") == "error":
                     error_msg = result.get("error", "Tool execution failed")
+                    logger.error(f"🔧 Tool {self.name} returned error status: {error_msg}")
                     raise Exception(f"Tool {self.name} failed: {error_msg}")
                 
                 # For successful results, return as-is
+                logger.info(f"🔧 Tool {self.name} execution successful")
                 return result
             else:
                 # For non-dict results, wrap in a structured response
-                return {
+                wrapped_result = {
                     "result": result,
                     "status": "success",
                     "tool": self.name
                 }
+                logger.info(f"🔧 Tool {self.name} result wrapped: {wrapped_result}")
+                return wrapped_result
             
         except Exception as e:
             error_details = {
@@ -85,36 +106,38 @@ class LangChainToolWrapper(BaseTool):
             }
             
             # Log the error for debugging
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Tool {self.name} execution failed: {e}")
+            logger.error(f"🔧 Tool {self.name} execution failed: {e}")
+            logger.exception(f"🔧 Full error traceback for {self.name}:")
             
             # Notify the callback manager if available
             if run_manager:
+                logger.debug(f"🔧 Notifying run manager of error for {self.name}")
                 await run_manager.on_tool_error(e)
             
             # Return structured error response instead of raising
             # This allows the agent to continue processing with error information
+            logger.info(f"🔧 Returning error details for {self.name}: {error_details}")
             return error_details
     
-    @property
-    def args_schema(self) -> Optional[Type[BaseModel]]:
-        """Return the arguments schema for the tool."""
+    def _generate_args_schema(self, custom_tool: CustomBaseTool) -> Optional[Type[BaseModel]]:
+        """Generate the arguments schema for the tool during initialization."""
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # Dynamically create a Pydantic model based on tool parameters
-        tool_def = self.custom_tool.definition
+        tool_def = custom_tool.definition
         
         if not tool_def.parameters:
             return None
         
         # Build fields dictionary for dynamic model
         fields = {}
+        annotations = {}
+        
         for param in tool_def.parameters:
             field_kwargs = {
                 "description": param.description,
             }
-            
-            if not param.required:
-                field_kwargs["default"] = param.default
             
             # Map parameter types to Python types
             param_type = str  # Default to string
@@ -129,16 +152,36 @@ class LangChainToolWrapper(BaseTool):
             elif param.type == "object":
                 param_type = dict
             
-            fields[param.name] = (param_type, Field(**field_kwargs))
+            # Handle optional parameters properly
+            if not param.required:
+                if param.default is not None:
+                    field_kwargs["default"] = param.default
+                else:
+                    field_kwargs["default"] = None
+                # Make type optional
+                from typing import Optional
+                param_type = Optional[param_type]
+            
+            # Store field info
+            annotations[param.name] = param_type
+            fields[param.name] = Field(**field_kwargs)
         
-        # Create dynamic Pydantic model
-        return type(
-            f"{self.name}Schema",
-            (BaseModel,),
-            {
-                "__annotations__": {name: field_type for name, (field_type, _) in fields.items()},
-                **{name: field_value for name, (_, field_value) in fields.items()}
-            }
-        )
+        try:
+            # Create dynamic Pydantic model class
+            schema_class = type(
+                f"{tool_def.name}Schema",
+                (BaseModel,),
+                {
+                    "__annotations__": annotations,
+                    **fields
+                }
+            )
+            
+            logger.debug(f"🔧 Generated schema for {tool_def.name}: {schema_class}")
+            return schema_class
+        except Exception as e:
+            logger.error(f"🔧 Failed to create schema for {tool_def.name}: {e}")
+            logger.exception(f"🔧 Schema creation exception:")
+            return None
 
 
