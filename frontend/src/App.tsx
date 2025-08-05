@@ -11,21 +11,30 @@ import './App.css';
 function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime> }) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
   // Load sessions from storage
   useEffect(() => {
-    const loadedSessions = storage.getSessions();
-    setSessions(loadedSessions);
-    
-    if (loadedSessions.length > 0 && !currentSessionId) {
-      setCurrentSessionId(loadedSessions[0].id);
+    try {
+      const loadedSessions = storage.getSessions();
+      setSessions(loadedSessions);
+      
+      if (loadedSessions.length > 0 && !currentSessionId) {
+        setCurrentSessionId(loadedSessions[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      setSessions([]);
     }
   }, [currentSessionId]);
 
   // Save sessions to storage whenever they change
   useEffect(() => {
-    storage.saveSessions(sessions);
+    try {
+      storage.saveSessions(sessions);
+    } catch (error) {
+      console.error('Failed to save sessions:', error);
+    }
   }, [sessions]);
 
   const handleNewSession = () => {
@@ -40,8 +49,8 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
     setSessions(prev => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
     
-    // Clear the current conversation in the runtime
-    runtime.switchToNewThread();
+    // Note: assistant-ui runtime doesn't have switchToNewThread method
+    // The Thread component will automatically handle new conversations
   };
 
   const handleDeleteSession = (sessionId: string) => {
@@ -53,7 +62,6 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
         setCurrentSessionId(remainingSessions[0].id);
       } else {
         setCurrentSessionId(null);
-        runtime.switchToNewThread();
       }
     }
   };
@@ -62,7 +70,6 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
     setCurrentSessionId(sessionId);
     // Note: In a full implementation, you'd want to restore the conversation history
     // This would require additional assistant-ui API calls
-    runtime.switchToNewThread();
   };
 
   const handleRenameSession = (sessionId: string, newName: string) => {
@@ -83,21 +90,19 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
     <div className={cn("h-screen flex bg-white text-gray-900")}>
       {/* Sidebar */}
       <div className={cn(
-        "transition-all duration-300 border-r border-gray-200 bg-gray-50",
-        sidebarCollapsed ? "w-0" : "w-64"
+        "transition-all duration-300 overflow-hidden",
+        sidebarCollapsed ? "w-0" : "w-80"
       )}>
-        {!sidebarCollapsed && (
-          <Sidebar
-            sessions={sessions}
-            currentSessionId={currentSessionId}
-            onNewSession={handleNewSession}
-            onSelectSession={handleSessionSelect}
-            onDeleteSession={handleDeleteSession}
-            onRenameSession={handleRenameSession}
-            isCollapsed={sidebarCollapsed}
-            onToggleCollapse={handleToggleCollapse}
-          />
-        )}
+        <Sidebar
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          onNewSession={handleNewSession}
+          onSelectSession={handleSessionSelect}
+          onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={handleToggleCollapse}
+        />
       </div>
 
       {/* Main Content */}
@@ -108,6 +113,7 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Toggle menu"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -119,7 +125,7 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
           </div>
           {currentSession && (
             <span className="text-sm text-gray-600">
-              {currentSession.messages.length} missatges
+              {currentSession.messages?.length || 0} missatges
             </span>
           )}
         </div>

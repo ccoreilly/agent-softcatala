@@ -4,12 +4,8 @@
   border-right: 1px solid #2a3441;
   display: flex;
   flex-direction: column;
-  transition: width 0.2s ease;
   min-height: 100vh;
-}
-
-.sidebar.collapsed {
-  width: 60px;
+  flex-shrink: 0;
 }
 
 .sidebar-header {
