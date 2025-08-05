@@ -149,6 +149,46 @@ class ModelManager:
         
         raise RuntimeError("No available language models found")
     
+    def get_provider_for_default_model(self):
+        """Get the provider instance for the default model."""
+        # Try Ollama first
+        if ModelProvider.OLLAMA in self.providers:
+            try:
+                # Just check if it can provide a model
+                self.providers[ModelProvider.OLLAMA].get_default_model()
+                return self.providers[ModelProvider.OLLAMA]
+            except Exception as e:
+                logger.warning(f"Failed to get default Ollama model: {e}")
+        
+        # Fall back to OpenRouter (free model)
+        if ModelProvider.OPENROUTER in self.providers:
+            try:
+                # Just check if it can provide a model
+                self.providers[ModelProvider.OPENROUTER].get_default_model()
+                return self.providers[ModelProvider.OPENROUTER]
+            except Exception as e:
+                logger.warning(f"Failed to get default OpenRouter model: {e}")
+        
+        # Fall back to OpenAI
+        if ModelProvider.OPENAI in self.providers:
+            try:
+                # Just check if it can provide a model
+                self.providers[ModelProvider.OPENAI].get_default_model()
+                return self.providers[ModelProvider.OPENAI]
+            except Exception as e:
+                logger.warning(f"Failed to get default OpenAI model: {e}")
+        
+        # Fall back to Zhipu
+        if ModelProvider.ZHIPU in self.providers:
+            try:
+                # Just check if it can provide a model
+                self.providers[ModelProvider.ZHIPU].get_default_model()
+                return self.providers[ModelProvider.ZHIPU]
+            except Exception as e:
+                logger.warning(f"Failed to get default Zhipu model: {e}")
+        
+        raise ValueError("No providers available for default model")
+    
     async def health_check(self) -> Dict[str, Any]:
         """Check the health of all providers."""
         health_status = {}

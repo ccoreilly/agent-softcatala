@@ -12,6 +12,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import RunnableConfig
 
 from models.model_manager import ModelManager
+from models.providers.hybrid_function_caller import HybridFunctionCaller
 from tools.langchain_tools import LangChainToolWrapper
 
 logger = logging.getLogger(__name__)
@@ -136,9 +137,12 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             logger.info("Using English prompt")
         
         try:
-            # Get the default model
+            # Get the default model and provider
             llm = self.model_manager.get_default_model()
+            provider = self.model_manager.get_provider_for_default_model()
+            
             logger.info(f"Using LLM: {llm}")
+            logger.info(f"Provider: {type(provider).__name__}")
             logger.info(f"LLM has bind_tools capability: {hasattr(llm, 'bind_tools')}")
             
             # Create agent if we have tools
@@ -148,21 +152,35 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                     logger.info(f"  - {tool.name}: {tool.description}")
                     logger.debug(f"    Schema: {tool.args_schema}")
                 
-                agent = create_openai_tools_agent(llm, self.tools, prompt)
-                logger.info("OpenAI tools agent created successfully")
+                # Check if this is OpenRouter provider and use hybrid approach
+                if hasattr(provider, 'supports_native_function_calling'):
+                    logger.info("Using OpenRouter provider with hybrid function calling")
+                    self.hybrid_caller = HybridFunctionCaller(provider, llm, self.tools)
+                    
+                    # For OpenRouter, we'll handle function calling in chat_stream method
+                    # For now, create a simple chain as fallback
+                    self.agent_executor = prompt | llm
+                    logger.info("Created hybrid function calling setup for OpenRouter")
+                else:
+                    # Use standard LangChain agent for other providers
+                    agent = create_openai_tools_agent(llm, self.tools, prompt)
+                    logger.info("OpenAI tools agent created successfully")
+                    
+                    self.agent_executor = AgentExecutor(
+                        agent=agent,
+                        tools=self.tools,
+                        verbose=True,
+                        handle_parsing_errors=True,
+                        max_iterations=3
+                    )
+                    logger.info("AgentExecutor created successfully")
+                    self.hybrid_caller = None
                 
-                self.agent_executor = AgentExecutor(
-                    agent=agent,
-                    tools=self.tools,
-                    verbose=True,
-                    handle_parsing_errors=True,
-                    max_iterations=3
-                )
-                logger.info("AgentExecutor created successfully")
                 logger.info(f"Agent executor type: {type(self.agent_executor)}")
             else:
                 # Simple chain without tools
                 self.agent_executor = prompt | llm
+                self.hybrid_caller = None
                 logger.info("Created simple chain without tools")
                 
         except Exception as e:
@@ -223,6 +241,35 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                 tags=["streaming"],
                 metadata={"session_id": session_id}
             )
+            
+            # Check if we should use hybrid function calling for OpenRouter
+            if hasattr(self, 'hybrid_caller') and self.hybrid_caller:
+                try:
+                    logger.info("Using hybrid function caller for OpenRouter")
+                    # Convert messages to LangChain format for hybrid caller
+                    langchain_messages = []
+                    for msg in [{"role": "system", "content": "You are a helpful assistant."}] + messages:
+                        role = msg.get("role", "")
+                        content = msg.get("content", "")
+                        
+                        if role == "user" or role == "human":
+                            langchain_messages.append(HumanMessage(content=content))
+                        elif role == "assistant" or role == "ai":
+                            langchain_messages.append(AIMessage(content=content))
+                        elif role == "system":
+                            langchain_messages.append(SystemMessage(content=content))
+                    
+                    response = await self.hybrid_caller.call_with_tools(langchain_messages)
+                    
+                    yield {
+                        "type": "content",
+                        "content": response.content,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    return
+                    
+                except Exception as e:
+                    logger.error(f"Hybrid function calling failed: {e}, falling back to regular agent")
             
             if hasattr(self.agent_executor, 'astream'):
                 # Stream with agent executor
