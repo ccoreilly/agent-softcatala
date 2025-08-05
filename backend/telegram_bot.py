@@ -509,6 +509,7 @@ class TelegramBot:
                         # Check if debug mode is enabled for this chat
                         debug_enabled = self.debug_mode.get(chat_id, False)
                         
+                        # Only show tool call messages when debug mode is enabled
                         if debug_enabled:
                             # Create detailed tool call message
                             tool_msg = f"🔧 **Eina seleccionada:** `{tool_name}`\n"
@@ -527,16 +528,13 @@ class TelegramBot:
                                 tool_msg += f"📋 **Paràmetres:** Cap\n"
                             
                             tool_msg += "⏳ **Estat:** Executant eina..."
-                        else:
-                            # Simple tool call message
-                            tool_msg = f"🔧 Utilitzant eina: {tool_name}..."
-                        
-                        await self.safe_edit_message(
-                            thinking_msg,
-                            tool_msg,
-                            parse_mode=ParseMode.MARKDOWN if debug_enabled else None,
-                            message_key=message_key
-                        )
+                            
+                            await self.safe_edit_message(
+                                thinking_msg,
+                                tool_msg,
+                                parse_mode=ParseMode.MARKDOWN,
+                                message_key=message_key
+                            )
                     
                     elif chunk_type == "tool_result":
                         tool_name = chunk.get("tool", "unknown")
@@ -548,6 +546,7 @@ class TelegramBot:
                         # Check if debug mode is enabled for this chat
                         debug_enabled = self.debug_mode.get(chat_id, False)
                         
+                        # Only show tool result messages when debug mode is enabled
                         if debug_enabled:
                             # Create detailed tool result message
                             result_msg = f"✅ **Eina completada:** `{tool_name}`\n"
@@ -608,16 +607,13 @@ class TelegramBot:
                                 result_msg += f"📤 **Resposta:** `{result_str}`\n"
                             
                             result_msg += "🤔 **Estat:** Processant resultats..."
-                        else:
-                            # Simple tool result message
-                            result_msg = "🤔 Processant resultats d'eines..."
-                        
-                        await self.safe_edit_message(
-                            thinking_msg,
-                            result_msg,
-                            parse_mode=ParseMode.MARKDOWN if debug_enabled else None,
-                            message_key=message_key
-                        )
+                            
+                            await self.safe_edit_message(
+                                thinking_msg,
+                                result_msg,
+                                parse_mode=ParseMode.MARKDOWN,
+                                message_key=message_key
+                            )
                     
                     elif chunk_type == "tool_error":
                         tool_name = chunk.get("tool", "unknown")
@@ -628,22 +624,20 @@ class TelegramBot:
                         # Check if debug mode is enabled for this chat
                         debug_enabled = self.debug_mode.get(chat_id, False)
                         
+                        # Only show tool error messages when debug mode is enabled
                         if debug_enabled:
                             # Create detailed tool error message
                             tool_error_msg = f"❌ **Error d'eina:** `{tool_name}`\n"
                             tool_error_msg += f"⏰ **Hora:** {timestamp}\n"
                             tool_error_msg += f"⚠️ **Error:** `{error_msg[:200]}{'...' if len(error_msg) > 200 else ''}`\n"
                             tool_error_msg += "🔄 Continuant sense aquesta eina..."
-                        else:
-                            # Simple tool error message
-                            tool_error_msg = f"❌ Error amb eina {tool_name}. Continuant..."
-                        
-                        await self.safe_edit_message(
-                            thinking_msg,
-                            tool_error_msg,
-                            parse_mode=ParseMode.MARKDOWN if debug_enabled else None,
-                            message_key=message_key
-                        )
+                            
+                            await self.safe_edit_message(
+                                thinking_msg,
+                                tool_error_msg,
+                                parse_mode=ParseMode.MARKDOWN,
+                                message_key=message_key
+                            )
                     
                     elif chunk_type == "error":
                         error_msg = chunk.get("error", "Error desconegut")
