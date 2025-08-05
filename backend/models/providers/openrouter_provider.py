@@ -1,12 +1,15 @@
-"""OpenRouter provider implementation."""
+"""OpenRouter provider implementation with fallback function calling."""
 
 import os
+import re
+import json
 from typing import List, Dict, Any, Optional
 import logging
 
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.utils.utils import secret_from_env
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from pydantic import Field, SecretStr
 
 from .base_provider import BaseProvider
@@ -28,7 +31,7 @@ class ChatOpenRouter(ChatOpenAI):
     
     def __init__(self, 
                  openai_api_key: Optional[str] = None,
-                 model: str = "anthropic/claude-3-5-haiku",
+                 model: str = "google/gemma-3-27b-it:free",
                  **kwargs):
         """Initialize ChatOpenRouter with OpenRouter-specific defaults."""
         openai_api_key = (
@@ -66,7 +69,43 @@ class ChatOpenRouter(ChatOpenAI):
 
 
 class OpenRouterProvider(BaseProvider):
-    """OpenRouter provider for accessing multiple LLM models through OpenRouter API."""
+    """OpenRouter provider for accessing multiple LLM models through OpenRouter API with fallback function calling."""
+    
+    # Models that support native function calling
+    NATIVE_FUNCTION_CALLING_MODELS = {
+        # Anthropic models (excellent tool support)
+        "anthropic/claude-3-5-sonnet",
+        "anthropic/claude-3-5-haiku", 
+        "anthropic/claude-3-haiku",
+        "anthropic/claude-3-sonnet",
+        "anthropic/claude-3-opus",
+        
+        # OpenAI models (excellent tool support)
+        "openai/gpt-4o",
+        "openai/gpt-4o-mini",
+        "openai/gpt-4-turbo",
+        "openai/gpt-4",
+        "openai/gpt-3.5-turbo",
+        
+        # Google models (good tool support)
+        "google/gemini-pro-1.5",
+        "google/gemini-flash-1.5",
+        "google/gemini-2.0-flash-exp",
+        
+        # Meta models (some tool support)
+        "meta-llama/llama-3.1-405b-instruct",
+        "meta-llama/llama-3.1-70b-instruct",
+        "meta-llama/llama-3.1-8b-instruct",
+        
+        # Mistral models (good tool support)
+        "mistralai/mistral-large",
+        "mistralai/mixtral-8x7b-instruct",
+        "mistralai/mixtral-8x22b-instruct",
+        
+        # Cohere models (good tool support)
+        "cohere/command-r-plus",
+        "cohere/command-r",
+    }
     
     def __init__(self, api_key: str = None, base_url: str = None, site_url: str = None, site_name: str = None):
         """Initialize OpenRouter provider.
@@ -86,11 +125,76 @@ class OpenRouterProvider(BaseProvider):
         self.site_name = site_name or os.getenv("OPENROUTER_SITE_NAME")
         super().__init__()
     
+    def supports_native_function_calling(self, model_name: str) -> bool:
+        """Check if a model supports native function calling."""
+        return model_name in self.NATIVE_FUNCTION_CALLING_MODELS
+    
+    def extract_tool_call(self, text: str) -> Optional[Dict[str, Any]]:
+        """Extract tool call from text response using regex (Philipp Schmid's approach)."""
+        pattern = r"```tool_code\s*(.*?)\s*```"
+        match = re.search(pattern, text, re.DOTALL)
+        if match:
+            code = match.group(1).strip()
+            try:
+                # Try to parse as a function call
+                # Expected format: function_name(arg1=value1, arg2=value2)
+                func_pattern = r"(\w+)\((.*?)\)"
+                func_match = re.search(func_pattern, code, re.DOTALL)
+                if func_match:
+                    func_name = func_match.group(1)
+                    args_str = func_match.group(2)
+                    
+                    # Parse arguments
+                    args = {}
+                    if args_str.strip():
+                        # Simple argument parsing for key=value pairs
+                        arg_pairs = args_str.split(',')
+                        for pair in arg_pairs:
+                            if '=' in pair:
+                                key, value = pair.split('=', 1)
+                                key = key.strip()
+                                value = value.strip().strip('"\'')
+                                args[key] = value
+                    
+                    return {
+                        "name": func_name,
+                        "arguments": args
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to parse tool call: {e}")
+        return None
+    
+    def create_function_calling_prompt(self, tools: List[Dict], user_message: str) -> str:
+        """Create a prompt for text-based function calling (Philipp Schmid's approach)."""
+        prompt = """At each turn, if you decide to invoke any of the function(s), it should be wrapped with ```tool_code```. The python methods described below are imported and available, you can only use defined methods. The generated code should be readable and efficient. The response to a method will be wrapped in ```tool_output``` use it to call more tools or generate a helpful, friendly response. When using a ```tool_call``` think step by step why and how it should be used.
+
+The following Python methods are available:
+
+"""
+        # Add function definitions
+        for tool in tools:
+            if hasattr(tool, 'definition'):
+                definition = tool.definition
+                name = definition.get('name', 'unknown')
+                description = definition.get('description', 'No description available')
+                parameters = definition.get('parameters', {}).get('properties', {})
+                
+                prompt += f"```python\ndef {name}("
+                param_strs = []
+                for param_name, param_info in parameters.items():
+                    param_type = param_info.get('type', 'str')
+                    param_strs.append(f"{param_name}: {param_type}")
+                prompt += ", ".join(param_strs)
+                prompt += f"):\n    \"\"\"{description}\n    \"\"\"\n```\n\n"
+        
+        prompt += f"User: {user_message}"
+        return prompt
+    
     def get_model(self, model_name: str, **kwargs) -> BaseChatModel:
         """Get a specific OpenRouter model instance.
         
         Args:
-            model_name: Name of the model to load (e.g., "anthropic/claude-3-5-haiku")
+            model_name: Name of the model to load (e.g., "google/gemma-3-27b-it:free")
             **kwargs: Additional parameters for the model
             
         Returns:
@@ -123,60 +227,65 @@ class OpenRouterProvider(BaseProvider):
         return ChatOpenRouter(**model_kwargs)
     
     def list_models(self) -> List[str]:
-        """List available OpenRouter models that support tool calling.
+        """List available OpenRouter models with mixed function calling support.
         
         Returns:
-            List of tool-compatible model names
+            List of available model names (both native and fallback supported)
         """
-        # Return a curated list of OpenRouter models that support tool calling
-        # Based on https://openrouter.ai/models?supported_parameters=tools
         return [
-            # Anthropic models (excellent tool support)
+            # Free models (great for testing, may need fallback function calling)
+            "google/gemma-3-27b-it:free",
+            "google/gemini-flash-1.5:free",
+            "mistralai/mistral-7b-instruct:free",
+            
+            # Anthropic models (native tool support)
             "anthropic/claude-3-5-sonnet",
             "anthropic/claude-3-5-haiku", 
             "anthropic/claude-3-haiku",
             "anthropic/claude-3-sonnet",
             "anthropic/claude-3-opus",
             
-            # OpenAI models (excellent tool support)
+            # OpenAI models (native tool support)
             "openai/gpt-4o",
             "openai/gpt-4o-mini",
             "openai/gpt-4-turbo",
             "openai/gpt-4",
             "openai/gpt-3.5-turbo",
             
-            # Google models (good tool support)
+            # Google models (mixed support)
             "google/gemini-pro-1.5",
             "google/gemini-flash-1.5",
             "google/gemini-2.0-flash-exp",
             
-            # Meta models (some tool support)
+            # Meta models (fallback function calling)
             "meta-llama/llama-3.1-405b-instruct",
             "meta-llama/llama-3.1-70b-instruct",
             "meta-llama/llama-3.1-8b-instruct",
             
-            # Mistral models (good tool support)
+            # Mistral models (native tool support)
             "mistralai/mistral-large",
             "mistralai/mixtral-8x7b-instruct",
             "mistralai/mixtral-8x22b-instruct",
             
-            # Cohere models (good tool support)
+            # Cohere models (native tool support)
             "cohere/command-r-plus",
             "cohere/command-r",
             
-            # Free models that support tools
-            "google/gemini-flash-1.5:free",
-            "mistralai/mistral-7b-instruct:free",
+            # Other popular models (fallback function calling)
+            "qwen/qwen-2.5-72b-instruct",
+            "deepseek/deepseek-coder",
+            "perplexity/llama-3.1-sonar-large-128k-online",
+            "perplexity/llama-3.1-sonar-small-128k-online"
         ]
     
     def get_default_model(self) -> BaseChatModel:
-        """Get the default OpenRouter model that supports tool calling.
+        """Get the default OpenRouter model.
         
         Returns:
-            ChatOpenRouter instance with anthropic/claude-3-5-haiku as default model
+            ChatOpenRouter instance with google/gemma-3-27b-it:free as default model
         """
-        # Use Claude 3.5 Haiku as default - excellent tool support and cost-effective
-        return self.get_model("anthropic/claude-3-5-haiku")
+        # Use Gemma 3 as default - free and supports fallback function calling
+        return self.get_model("google/gemma-3-27b-it:free")
     
     async def health_check(self) -> Dict[str, Any]:
         """Check OpenRouter API health.
@@ -186,7 +295,7 @@ class OpenRouterProvider(BaseProvider):
         """
         try:
             # Try to create a model instance and make a simple call to verify connectivity
-            model = self.get_model("anthropic/claude-3-5-haiku")
+            model = self.get_model("google/gemma-3-27b-it:free")
             
             # Test with a minimal request
             test_response = await model.ainvoke("Hello")
@@ -194,11 +303,12 @@ class OpenRouterProvider(BaseProvider):
             return {
                 "status": "healthy",
                 "provider": "openrouter",
-                "default_model": "anthropic/claude-3-5-haiku",
+                "default_model": "google/gemma-3-27b-it:free",
                 "api_key_configured": bool(self.api_key),
                 "base_url": self.base_url,
                 "available_models_count": len(self.list_models()),
-                "tool_calling_supported": True,
+                "native_function_calling_models": len(self.NATIVE_FUNCTION_CALLING_MODELS),
+                "fallback_function_calling_supported": True,
                 "site_attribution": {
                     "site_url": self.site_url,
                     "site_name": self.site_name
@@ -211,5 +321,5 @@ class OpenRouterProvider(BaseProvider):
                 "error": str(e),
                 "api_key_configured": bool(self.api_key),
                 "base_url": self.base_url,
-                "tool_calling_supported": False
+                "fallback_function_calling_supported": False
             }
