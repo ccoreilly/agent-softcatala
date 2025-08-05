@@ -15,17 +15,26 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
 
   // Load sessions from storage
   useEffect(() => {
-    const loadedSessions = storage.getSessions();
-    setSessions(loadedSessions);
-    
-    if (loadedSessions.length > 0 && !currentSessionId) {
-      setCurrentSessionId(loadedSessions[0].id);
+    try {
+      const loadedSessions = storage.getSessions();
+      setSessions(loadedSessions);
+      
+      if (loadedSessions.length > 0 && !currentSessionId) {
+        setCurrentSessionId(loadedSessions[0].id);
+      }
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      setSessions([]);
     }
   }, [currentSessionId]);
 
   // Save sessions to storage whenever they change
   useEffect(() => {
-    storage.saveSessions(sessions);
+    try {
+      storage.saveSessions(sessions);
+    } catch (error) {
+      console.error('Failed to save sessions:', error);
+    }
   }, [sessions]);
 
   const handleNewSession = () => {
@@ -104,6 +113,7 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Toggle menu"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -115,7 +125,7 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
           </div>
           {currentSession && (
             <span className="text-sm text-gray-600">
-              {currentSession.messages.length} missatges
+              {currentSession.messages?.length || 0} missatges
             </span>
           )}
         </div>
