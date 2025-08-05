@@ -1,15 +1,68 @@
 """OpenRouter provider implementation."""
 
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
 
 from langchain_openai import ChatOpenAI
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.utils.utils import secret_from_env
+from pydantic import Field, SecretStr
 
 from .base_provider import BaseProvider
 
 logger = logging.getLogger(__name__)
+
+
+class ChatOpenRouter(ChatOpenAI):
+    """Custom ChatOpenAI subclass for OpenRouter with proper configuration."""
+    
+    openai_api_key: Optional[SecretStr] = Field(
+        alias="api_key",
+        default_factory=lambda: secret_from_env("OPENROUTER_API_KEY", default=None),
+    )
+    
+    @property
+    def lc_secrets(self) -> dict[str, str]:
+        return {"openai_api_key": "OPENROUTER_API_KEY"}
+    
+    def __init__(self, 
+                 openai_api_key: Optional[str] = None,
+                 model: str = "anthropic/claude-3-5-haiku",
+                 **kwargs):
+        """Initialize ChatOpenRouter with OpenRouter-specific defaults."""
+        openai_api_key = (
+            openai_api_key or os.environ.get("OPENROUTER_API_KEY")
+        )
+        
+        if not openai_api_key:
+            raise ValueError("OpenRouter API key is required. Set OPENROUTER_API_KEY environment variable.")
+        
+        # Set OpenRouter-specific defaults
+        kwargs.setdefault("base_url", "https://openrouter.ai/api/v1")
+        kwargs.setdefault("temperature", 0.7)
+        kwargs.setdefault("max_tokens", 2048)
+        
+        # Add OpenRouter-specific headers
+        default_headers = kwargs.get("default_headers", {})
+        
+        # Add attribution headers if available
+        site_url = os.getenv("OPENROUTER_SITE_URL")
+        site_name = os.getenv("OPENROUTER_SITE_NAME")
+        
+        if site_url:
+            default_headers["HTTP-Referer"] = site_url
+        if site_name:
+            default_headers["X-Title"] = site_name
+            
+        if default_headers:
+            kwargs["default_headers"] = default_headers
+        
+        super().__init__(
+            model=model,
+            openai_api_key=openai_api_key,
+            **kwargs
+        )
 
 
 class OpenRouterProvider(BaseProvider):
@@ -37,16 +90,16 @@ class OpenRouterProvider(BaseProvider):
         """Get a specific OpenRouter model instance.
         
         Args:
-            model_name: Name of the model to load (e.g., "anthropic/claude-3-sonnet")
+            model_name: Name of the model to load (e.g., "anthropic/claude-3-5-haiku")
             **kwargs: Additional parameters for the model
             
         Returns:
-            ChatOpenAI instance configured for OpenRouter
+            ChatOpenRouter instance configured for OpenRouter
         """
         model_kwargs = {
-            "model": model_name,
             "openai_api_key": self.api_key,
-            "openai_api_base": self.base_url,
+            "model": model_name,
+            "base_url": self.base_url,
             "temperature": kwargs.get("temperature", 0.7),
             "max_tokens": kwargs.get("max_tokens", 2048),
             "top_p": kwargs.get("top_p", 1.0),
@@ -67,45 +120,63 @@ class OpenRouterProvider(BaseProvider):
             if key not in ["temperature", "max_tokens", "top_p"]:
                 model_kwargs[key] = value
         
-        return ChatOpenAI(**model_kwargs)
+        return ChatOpenRouter(**model_kwargs)
     
     def list_models(self) -> List[str]:
-        """List available OpenRouter models.
+        """List available OpenRouter models that support tool calling.
         
         Returns:
-            List of popular model names
+            List of tool-compatible model names
         """
-        # Return a curated list of popular OpenRouter models
-        # In a production environment, you might want to fetch this from OpenRouter's API
+        # Return a curated list of OpenRouter models that support tool calling
+        # Based on https://openrouter.ai/models?supported_parameters=tools
         return [
-            "google/gemma-3-27b-it:free",
+            # Anthropic models (excellent tool support)
             "anthropic/claude-3-5-sonnet",
+            "anthropic/claude-3-5-haiku", 
             "anthropic/claude-3-haiku",
+            "anthropic/claude-3-sonnet",
+            "anthropic/claude-3-opus",
+            
+            # OpenAI models (excellent tool support)
             "openai/gpt-4o",
             "openai/gpt-4o-mini",
             "openai/gpt-4-turbo",
+            "openai/gpt-4",
             "openai/gpt-3.5-turbo",
-            "google/gemini-pro",
+            
+            # Google models (good tool support)
             "google/gemini-pro-1.5",
+            "google/gemini-flash-1.5",
+            "google/gemini-2.0-flash-exp",
+            
+            # Meta models (some tool support)
             "meta-llama/llama-3.1-405b-instruct",
             "meta-llama/llama-3.1-70b-instruct",
             "meta-llama/llama-3.1-8b-instruct",
-            "mistralai/mistral-7b-instruct",
+            
+            # Mistral models (good tool support)
+            "mistralai/mistral-large",
             "mistralai/mixtral-8x7b-instruct",
             "mistralai/mixtral-8x22b-instruct",
-            "qwen/qwen-2.5-72b-instruct",
-            "deepseek/deepseek-coder",
-            "perplexity/llama-3.1-sonar-large-128k-online",
-            "perplexity/llama-3.1-sonar-small-128k-online"
+            
+            # Cohere models (good tool support)
+            "cohere/command-r-plus",
+            "cohere/command-r",
+            
+            # Free models that support tools
+            "google/gemini-flash-1.5:free",
+            "mistralai/mistral-7b-instruct:free",
         ]
     
     def get_default_model(self) -> BaseChatModel:
-        """Get the default OpenRouter model.
+        """Get the default OpenRouter model that supports tool calling.
         
         Returns:
-            ChatOpenAI instance with google/gemma-3-27b-it:free as default model
+            ChatOpenRouter instance with anthropic/claude-3-5-haiku as default model
         """
-        return self.get_model("google/gemma-3-27b-it:free")
+        # Use Claude 3.5 Haiku as default - excellent tool support and cost-effective
+        return self.get_model("anthropic/claude-3-5-haiku")
     
     async def health_check(self) -> Dict[str, Any]:
         """Check OpenRouter API health.
@@ -115,7 +186,7 @@ class OpenRouterProvider(BaseProvider):
         """
         try:
             # Try to create a model instance and make a simple call to verify connectivity
-            model = self.get_model("openai/gpt-4o-mini")
+            model = self.get_model("anthropic/claude-3-5-haiku")
             
             # Test with a minimal request
             test_response = await model.ainvoke("Hello")
@@ -123,10 +194,11 @@ class OpenRouterProvider(BaseProvider):
             return {
                 "status": "healthy",
                 "provider": "openrouter",
-                "default_model": "google/gemma-3-27b-it:free",
+                "default_model": "anthropic/claude-3-5-haiku",
                 "api_key_configured": bool(self.api_key),
                 "base_url": self.base_url,
                 "available_models_count": len(self.list_models()),
+                "tool_calling_supported": True,
                 "site_attribution": {
                     "site_url": self.site_url,
                     "site_name": self.site_name
@@ -138,5 +210,6 @@ class OpenRouterProvider(BaseProvider):
                 "provider": "openrouter",
                 "error": str(e),
                 "api_key_configured": bool(self.api_key),
-                "base_url": self.base_url
+                "base_url": self.base_url,
+                "tool_calling_supported": False
             }
