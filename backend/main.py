@@ -33,12 +33,14 @@ def validate_providers():
     """Validate that at least one LLM provider is properly configured."""
     ollama_url = os.getenv("OLLAMA_URL")
     zhipu_api_key = os.getenv("ZHIPUAI_API_KEY")
+    openai_key = os.getenv("OPENAI_KEY")
     
-    if not ollama_url and not zhipu_api_key:
+    if not ollama_url and not zhipu_api_key and not openai_key:
         error_msg = (
             "No LLM providers configured. Please set at least one of:\n"
             "- OLLAMA_URL (for Ollama provider)\n"
-            "- ZHIPUAI_API_KEY (for Zhipu AI provider)"
+            "- ZHIPUAI_API_KEY (for Zhipu AI provider)\n"
+            "- OPENAI_KEY (for OpenAI provider)"
         )
         logger.error(error_msg)
         raise RuntimeError(error_msg)
@@ -49,6 +51,8 @@ def validate_providers():
         configured_providers.append(f"Ollama ({ollama_url})")
     if zhipu_api_key:
         configured_providers.append("Zhipu AI")
+    if openai_key:
+        configured_providers.append("OpenAI")
     
     logger.info(f"Configured providers: {', '.join(configured_providers)}")
 

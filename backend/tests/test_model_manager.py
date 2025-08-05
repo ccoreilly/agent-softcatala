@@ -26,14 +26,15 @@ class TestModelManagerInitialization:
     def setup_method(self):
         """Setup for each test method."""
         # Clear any existing environment variables that might affect tests
-        env_vars_to_clear = ['OLLAMA_URL', 'ZHIPUAI_API_KEY']
+        env_vars_to_clear = ['OLLAMA_URL', 'ZHIPUAI_API_KEY', 'OPENAI_KEY']
         for var in env_vars_to_clear:
             if var in os.environ:
                 del os.environ[var]
     
+    @patch('models.model_manager.OpenAIProvider')
     @patch('models.model_manager.OllamaProvider')
     @patch('models.model_manager.ZhipuProvider')
-    def test_ollama_not_initialized_when_url_not_set(self, mock_zhipu, mock_ollama):
+    def test_ollama_not_initialized_when_url_not_set(self, mock_zhipu, mock_ollama, mock_openai):
         """Test that Ollama is not initialized when OLLAMA_URL is not set."""
         # Ensure OLLAMA_URL is not set
         assert 'OLLAMA_URL' not in os.environ
@@ -424,4 +425,127 @@ class TestModelManagerRegression:
         assert ModelProvider.ZHIPU in manager.providers
         
         # This should NOT produce any Ollama connection errors in logs
+
+
+class TestOpenAIProviderIntegration:
+    """Test OpenAI provider integration with ModelManager."""
+    
+    def setup_method(self):
+        """Setup for each test method."""
+        # Clear any existing environment variables that might affect tests
+        env_vars_to_clear = ['OLLAMA_URL', 'ZHIPUAI_API_KEY', 'OPENAI_KEY', 'OPENAI_BASE_URL']
+        for var in env_vars_to_clear:
+            if var in os.environ:
+                del os.environ[var]
+    
+    @patch('models.model_manager.OpenAIProvider')
+    @patch('models.model_manager.OllamaProvider')
+    @patch('models.model_manager.ZhipuProvider')
+    def test_openai_provider_initialized_when_key_set(self, mock_zhipu, mock_ollama, mock_openai):
+        """Test that OpenAI provider is initialized when OPENAI_KEY is set."""
+        os.environ['OPENAI_KEY'] = 'test-openai-key'
+        
+        # Mock OpenAI provider
+        mock_openai.return_value = MagicMock()
+        
+        # Create ModelManager
+        manager = ModelManager()
+        
+        # OpenAI should be initialized
+        mock_openai.assert_called_once_with('test-openai-key')
+        assert ModelProvider.OPENAI in manager.providers
+        
+        # Other providers should not be initialized (no keys/URLs)
+        mock_ollama.assert_not_called()
+        mock_zhipu.assert_not_called()
+        assert ModelProvider.OLLAMA not in manager.providers
+        assert ModelProvider.ZHIPU not in manager.providers
+    
+    @patch('models.model_manager.OpenAIProvider')
+    @patch('models.model_manager.OllamaProvider')
+    @patch('models.model_manager.ZhipuProvider')
+    def test_openai_provider_with_custom_base_url(self, mock_zhipu, mock_ollama, mock_openai):
+        """Test that OpenAI provider supports custom base URL."""
+        os.environ['OPENAI_KEY'] = 'test-openai-key'
+        os.environ['OPENAI_BASE_URL'] = 'https://custom.openai.com/v1'
+        
+        # Mock OpenAI provider
+        mock_openai.return_value = MagicMock()
+        
+        # Create ModelManager
+        manager = ModelManager()
+        
+        # OpenAI should be initialized with custom base URL
+        mock_openai.assert_called_once_with('test-openai-key', 'https://custom.openai.com/v1')
+        assert ModelProvider.OPENAI in manager.providers
+    
+    @patch('models.model_manager.OpenAIProvider')
+    @patch('models.model_manager.OllamaProvider')
+    @patch('models.model_manager.ZhipuProvider')
+    def test_all_three_providers_initialized(self, mock_zhipu, mock_ollama, mock_openai):
+        """Test that all three providers can be initialized together."""
+        os.environ['OLLAMA_URL'] = 'http://localhost:11434'
+        os.environ['ZHIPUAI_API_KEY'] = 'test-zhipu-key'
+        os.environ['OPENAI_KEY'] = 'test-openai-key'
+        
+        # Mock all providers
+        mock_ollama.return_value = MagicMock()
+        mock_zhipu.return_value = MagicMock()
+        mock_openai.return_value = MagicMock()
+        
+        # Create ModelManager
+        manager = ModelManager()
+        
+        # All providers should be initialized
+        mock_ollama.assert_called_once_with('http://localhost:11434')
+        mock_zhipu.assert_called_once_with('test-zhipu-key')
+        mock_openai.assert_called_once_with('test-openai-key')
+        
+        assert ModelProvider.OLLAMA in manager.providers
+        assert ModelProvider.ZHIPU in manager.providers
+        assert ModelProvider.OPENAI in manager.providers
+    
+    @patch('models.model_manager.OpenAIProvider')
+    @patch('models.model_manager.OllamaProvider')
+    @patch('models.model_manager.ZhipuProvider')
+    def test_openai_provider_error_handling(self, mock_zhipu, mock_ollama, mock_openai):
+        """Test error handling when OpenAI provider initialization fails."""
+        os.environ['OPENAI_KEY'] = 'test-openai-key'
+        
+        # Make OpenAI provider raise an exception
+        mock_openai.side_effect = Exception("OpenAI API error")
+        
+        # Create ModelManager
+        manager = ModelManager()
+        
+        # OpenAI should not be in providers due to error
+        assert ModelProvider.OPENAI not in manager.providers
+    
+    @patch('models.model_manager.OpenAIProvider')
+    @patch('models.model_manager.OllamaProvider')
+    @patch('models.model_manager.ZhipuProvider')
+    def test_get_default_model_prefers_ollama_then_openai(self, mock_zhipu, mock_ollama, mock_openai):
+        """Test that get_default_model prefers Ollama, then OpenAI, then Zhipu."""
+        os.environ['ZHIPUAI_API_KEY'] = 'test-zhipu-key'
+        os.environ['OPENAI_KEY'] = 'test-openai-key'
+        
+        # Mock all providers
+        mock_zhipu_instance = MagicMock()
+        mock_openai_instance = MagicMock()
+        mock_zhipu.return_value = mock_zhipu_instance
+        mock_openai.return_value = mock_openai_instance
+        
+        # Set up default models
+        mock_openai_instance.get_default_model.return_value = MagicMock()
+        mock_zhipu_instance.get_default_model.return_value = MagicMock()
+        
+        # Create ModelManager
+        manager = ModelManager()
+        
+        # Should use OpenAI as default (Ollama not available)
+        default_model = manager.get_default_model()
+        
+        # OpenAI should be called first
+        mock_openai_instance.get_default_model.assert_called_once()
+        mock_zhipu_instance.get_default_model.assert_not_called()
         # (which was the original problem)
