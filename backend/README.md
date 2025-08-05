@@ -4,7 +4,7 @@ A powerful backend service that provides LLM-powered chat capabilities through b
 
 ## Features
 
-- **Multi-Provider LLM Support**: Supports Ollama, Zhipu AI, and other providers
+- **Multi-Provider LLM Support**: Supports Ollama, Zhipu AI, OpenAI, OpenRouter, and other providers
 - **Tool Integration**: Web browsing, Wikipedia search, and extensible tool system
 - **Streaming Responses**: Real-time response streaming for better user experience  
 - **Model Switching**: Dynamic switching between different models and providers
@@ -24,6 +24,10 @@ You can configure the application in three ways:
 export OLLAMA_URL=http://localhost:11434
 # OR
 export ZHIPUAI_API_KEY=your_zhipu_api_key
+# OR
+export OPENAI_KEY=your_openai_api_key
+# OR
+export OPENROUTER_API_KEY=your_openrouter_api_key
 
 # Optional configurations
 export CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
@@ -47,6 +51,10 @@ cp .env.example .env
 OLLAMA_URL=http://localhost:11434
 # OR
 ZHIPUAI_API_KEY=your_zhipu_api_key
+# OR
+OPENAI_KEY=your_openai_api_key
+# OR
+OPENROUTER_API_KEY=your_openrouter_api_key
 
 # Optional: Use custom endpoint (normally not needed)
 # Z.AI and Zhipu AI use the same API endpoint by default
@@ -72,7 +80,7 @@ OLLAMA_URL=http://localhost:11434 python3 main.py
 ZHIPUAI_API_KEY=your_api_key python3 main.py
 ```
 
-**Important**: At least one of `OLLAMA_URL` or `ZHIPUAI_API_KEY` must be set for the application to start.
+**Important**: At least one of `OLLAMA_URL`, `ZHIPUAI_API_KEY`, `OPENAI_KEY`, or `OPENROUTER_API_KEY` must be set for the application to start.
 
 ### Installation
 
@@ -150,6 +158,41 @@ The system automatically uses the correct Z.AI/Zhipu API endpoint. No additional
 
 ### Features
 - **Hybrid Reasoning**: Supports both thinking mode (complex reasoning) and non-thinking mode (instant responses)
+
+## OpenRouter Integration
+
+OpenRouter provides access to 100+ AI models through a single API, including Claude, GPT-4, Gemini, and many open-source models. It offers automatic fallbacks, competitive pricing, and access to free models.
+
+### Configuration
+Set the following environment variable:
+```bash
+OPENROUTER_API_KEY=your_openrouter_api_key
+```
+
+Optional configuration for attribution and tracking:
+```bash
+OPENROUTER_SITE_URL=https://yoursite.com     # Your site URL (for OpenRouter rankings)
+OPENROUTER_SITE_NAME="Your App Name"         # Your app name (for OpenRouter rankings)
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1  # Custom endpoint (usually not needed)
+```
+
+### Models
+- **Default**: `google/gemma-3-27b-it:free` (free model, no cost)
+- **Popular models available**:
+  - `google/gemma-3-27b-it:free` - Free Gemma model (default)
+  - `anthropic/claude-3-5-sonnet` - Latest Claude model
+  - `openai/gpt-4o` - GPT-4 Omni
+  - `openai/gpt-4o-mini` - Smaller, faster GPT-4
+  - `meta-llama/llama-3.1-405b-instruct` - Large Llama model
+  - `google/gemini-pro` - Google's Gemini Pro
+  - `mistralai/mixtral-8x7b-instruct` - Mistral's mixture model
+  - And 100+ more models
+
+### Features
+- **Free Models**: Access to several free models with no API costs
+- **Automatic Fallbacks**: If one provider is down, automatically switches to backup
+- **Unified Interface**: Access all models through a single API
+- **Cost Optimization**: Automatically routes to the most cost-effective provider
 - **Tool Integration**: Native function calling capabilities for agent applications
 - **128K Context**: Extended context length for long conversations
 - **Streaming Support**: Real-time response streaming
@@ -312,6 +355,12 @@ class CustomTool(BaseTool):
 |----------|-------------|---------|----------|
 | `OLLAMA_URL` | Ollama service URL | `http://localhost:11434` | No |
 | `ZHIPU_API_KEY` | Zhipu AI API key | None | No |
+| `OPENAI_KEY` | OpenAI API key | None | No |
+| `OPENAI_BASE_URL` | Custom OpenAI base URL | None | No |
+| `OPENROUTER_API_KEY` | OpenRouter API key | None | No |
+| `OPENROUTER_BASE_URL` | Custom OpenRouter base URL | `https://openrouter.ai/api/v1` | No |
+| `OPENROUTER_SITE_URL` | Your site URL (for OpenRouter attribution) | None | No |
+| `OPENROUTER_SITE_NAME` | Your site name (for OpenRouter attribution) | None | No |
 | `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | `http://localhost:3000` | No |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token | None | No |
 | `TELEGRAM_MAX_USER_MESSAGES` | Max user messages in history | `20` | No |

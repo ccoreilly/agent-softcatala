@@ -8,7 +8,7 @@ import logging
 from langchain_core.language_models.base import BaseLanguageModel
 from langchain_core.language_models.chat_models import BaseChatModel
 
-from .providers import OllamaProvider, ZhipuProvider, OpenAIProvider
+from .providers import OllamaProvider, ZhipuProvider, OpenAIProvider, OpenRouterProvider
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ class ModelProvider(str, Enum):
     OLLAMA = "ollama"
     ZHIPU = "zhipu"
     OPENAI = "openai"
+    OPENROUTER = "openrouter"
 
 
 class ModelManager:
@@ -74,6 +75,27 @@ class ModelManager:
                 logger.warning(f"Failed to initialize OpenAI provider: {e}")
         else:
             logger.warning("OPENAI_KEY not found, OpenAI provider not initialized")
+        
+        # Initialize OpenRouter provider
+        openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+        if openrouter_api_key:
+            try:
+                # Support custom OpenRouter base URL, site URL and site name if needed
+                openrouter_base_url = os.getenv("OPENROUTER_BASE_URL")
+                openrouter_site_url = os.getenv("OPENROUTER_SITE_URL")
+                openrouter_site_name = os.getenv("OPENROUTER_SITE_NAME")
+                
+                self.providers[ModelProvider.OPENROUTER] = OpenRouterProvider(
+                    openrouter_api_key, 
+                    openrouter_base_url, 
+                    openrouter_site_url, 
+                    openrouter_site_name
+                )
+                logger.info(f"Initialized OpenRouter provider with endpoint: {openrouter_base_url or 'https://openrouter.ai/api/v1'}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize OpenRouter provider: {e}")
+        else:
+            logger.warning("OPENROUTER_API_KEY not found, OpenRouter provider not initialized")
     
     def get_model(self, provider: str, model_name: str, **kwargs) -> BaseChatModel:
         """Get a specific model from a provider."""
@@ -103,6 +125,13 @@ class ModelManager:
                 return self.providers[ModelProvider.OLLAMA].get_default_model()
             except Exception as e:
                 logger.warning(f"Failed to get default Ollama model: {e}")
+        
+        # Fall back to OpenRouter (free model)
+        if ModelProvider.OPENROUTER in self.providers:
+            try:
+                return self.providers[ModelProvider.OPENROUTER].get_default_model()
+            except Exception as e:
+                logger.warning(f"Failed to get default OpenRouter model: {e}")
         
         # Fall back to OpenAI
         if ModelProvider.OPENAI in self.providers:
