@@ -55,6 +55,7 @@ jobs:
         cd backend
         python -m pip install --upgrade pip
         python -m pip install wheel
+        python -m pip install -r requirements.txt
         python -m pip install -r requirements-dev.txt
         
     - name: Lint with flake8
@@ -69,6 +70,10 @@ jobs:
       run: |
         cd backend
         python -m pytest tests/test_minimal.py tests/test_basic.py tests/test_realistic.py -v --cov=. --cov-report=term-missing
+      env:
+        OLLAMA_URL: http://localhost:11434
+        ZHIPUAI_API_KEY: test-zhipu-key
+        OPENAI_KEY: test-openai-key
         
     # Docker build test temporarily disabled - can be re-enabled later
     # - name: Test Docker build

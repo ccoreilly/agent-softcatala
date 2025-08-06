@@ -47,6 +47,10 @@ jobs:
         python -m pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_agent_initialization_with_tools -v
         python -m pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_tool_parameter_validation -v
         python -m pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_multiple_tool_types -v
+      env:
+        OLLAMA_URL: http://localhost:11434
+        ZHIPUAI_API_KEY: test-zhipu-key
+        OPENAI_KEY: test-openai-key
     
     - name: Run comprehensive test script
       env:
