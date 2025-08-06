@@ -47,17 +47,20 @@ def test_health_endpoint():
     # Mock the agent's health check to avoid external dependencies
     with patch('main.agent.check_health', new_callable=AsyncMock) as mock_health:
         mock_health.return_value = {
-            "status": "healthy",
-            "model": "test-model",
-            "provider": "test-provider"
+            "agent": "healthy",
+            "timestamp": "2024-01-01T00:00:00.000000",
+            "models": {"test": {"status": "healthy"}},
+            "tools": {"count": 0, "names": []},
+            "agent_type": "test"
         }
         
         response = client.get("/health")
         assert response.status_code == 200
         
         data = response.json()
-        assert "status" in data
+        assert "agent" in data
         assert "timestamp" in data
+        assert data["agent"] == "healthy"
 
 
 @pytest.mark.skipif(not MAIN_AVAILABLE, reason="main.py not available")
