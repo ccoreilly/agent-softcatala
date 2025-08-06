@@ -4,9 +4,8 @@
 import os
 import sys
 import asyncio
-sys.path.append('backend')
 
-from backend.models.model_manager import ModelManager, ModelProvider
+from models.model_manager import ModelManager, ModelProvider
 
 
 async def test_zai_integration():

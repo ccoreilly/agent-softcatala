@@ -26,27 +26,30 @@ jobs:
       with:
         python-version: '3.11'
     
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+    
     - name: Install dependencies
       run: |
         cd backend
-        pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-asyncio
+        uv sync --dev
     
     - name: Run tool execution tests
       env:
         ZHIPUAI_API_KEY: ${{ secrets.ZHIPUAI_API_KEY }}
       run: |
         cd backend
-        python -m pytest tests/test_tool_execution_integration.py -v --tb=short
+        uv run pytest tests/test_tool_execution_integration.py -v --tb=short
     
     - name: Run basic tool tests (without API)
       run: |
         cd backend
-        python -m pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_tool_schema_generation -v
-        python -m pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_agent_initialization_with_tools -v
-        python -m pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_tool_parameter_validation -v
-        python -m pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_multiple_tool_types -v
+        uv run pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_tool_schema_generation -v
+        uv run pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_agent_initialization_with_tools -v
+        uv run pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_tool_parameter_validation -v
+        uv run pytest tests/test_tool_execution_integration.py::TestToolExecutionIntegration::test_multiple_tool_types -v
       env:
         OLLAMA_URL: http://localhost:11434
         ZHIPUAI_API_KEY: test-zhipu-key
@@ -57,4 +60,4 @@ jobs:
         ZHIPUAI_API_KEY: ${{ secrets.ZHIPUAI_API_KEY }}
       run: |
         cd backend
-        python test_tool_execution.py || echo "Ollama not available, but tool infrastructure tests passed"
+        uv run python test_tool_execution.py || echo "Ollama not available, but tool infrastructure tests passed"

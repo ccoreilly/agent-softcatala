@@ -1,3 +1,8 @@
+# LEGACY: This file is kept for backwards compatibility
+# For new installations, please use uv and pyproject.toml:
+# curl -LsSf https://astral.sh/uv/install.sh | sh
+# uv sync
+#
 # Final compatible requirements - no dependency conflicts
 fastapi==0.104.1
 uvicorn[standard]==0.24.0

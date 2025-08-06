@@ -50,6 +50,14 @@ tests/
    ```
 
 2. **Install dependencies and run manually:**
+   
+   **Using uv (recommended):**
+   ```bash
+   uv sync --dev
+   uv run pytest tests/ -v
+   ```
+   
+   **Using pip (legacy):**
    ```bash
    pip install -r requirements.txt
    pip install -r requirements-dev.txt
@@ -57,6 +65,13 @@ tests/
    ```
 
 3. **Run with coverage:**
+   
+   **Using uv:**
+   ```bash
+   uv run pytest tests/ -v --cov=. --cov-report=html
+   ```
+   
+   **Using pip:**
    ```bash
    python -m pytest tests/ -v --cov=. --cov-report=html
    ```

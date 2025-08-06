@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rust and Cargo
+# Install Rust and Cargo (still needed for some Python packages)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
@@ -23,17 +23,19 @@ ENV RUSTUP_HOME=/tmp/rustup
 # Create cargo directory with proper permissions
 RUN mkdir -p /tmp/cargo/registry/cache
 
-# Copy requirements first for better Docker layer caching
-COPY requirements.txt .
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Upgrade pip and install wheel
-RUN pip install --upgrade pip wheel
+# Copy dependency files first for better Docker layer caching
+COPY pyproject.toml .
 
-# Install Python dependencies with specific flags for Rust packages
-RUN pip install --no-cache-dir \
-    --prefer-binary \
-    --force-reinstall \
-    -r requirements.txt
+# Install Python dependencies using uv
+RUN uv venv /opt/venv
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
+
+# Install dependencies using uv
+RUN uv sync --no-dev
 
 # Copy application code
 COPY . .

@@ -84,6 +84,37 @@ ZHIPUAI_API_KEY=your_api_key python3 main.py
 
 ### Installation
 
+#### Option 1: Using uv (Recommended)
+
+1. **Install uv** (if not already installed):
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   # or
+   pip install uv
+   ```
+
+2. **Install Dependencies**:
+   ```bash
+   # Create virtual environment and install dependencies (recommended)
+   uv sync
+   
+   # Alternative: Create environment and install with pip-style commands
+   uv venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   uv pip install -r requirements.txt
+   ```
+
+3. **Start the Service**:
+   ```bash
+   # If using uv sync (recommended)
+   uv run python main.py
+   
+   # Or if virtual environment is activated
+   python main.py
+   ```
+
+#### Option 2: Using pip (Legacy)
+
 1. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
@@ -463,6 +494,47 @@ Log format:
 - **Concurrent Users**: Monitor resource usage with multiple Telegram users
 
 ## Development
+
+### Development Setup with uv
+
+For development, we recommend using `uv` for faster dependency management:
+
+```bash
+# Clone the repository
+git clone https://github.com/softcatala/agent-softcatala.git
+cd agent-softcatala/backend
+
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create virtual environment and install dependencies (including dev dependencies)
+uv sync --dev
+
+# Run the development server
+uv run python main.py
+
+# Run tests
+uv run pytest
+
+# Run linting
+uv run black .
+uv run isort .
+uv run flake8 .
+uv run mypy .
+```
+
+### Adding Dependencies
+
+```bash
+# Add a new dependency
+uv add package-name
+
+# Add a development dependency
+uv add --dev package-name
+
+# Update dependencies
+uv sync
+```
 
 ### Project Structure
 
