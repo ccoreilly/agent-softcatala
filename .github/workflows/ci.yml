@@ -55,7 +55,6 @@ jobs:
         cd backend
         python -m pip install --upgrade pip
         python -m pip install wheel
-        python -m pip install -r requirements-minimal.txt
         python -m pip install -r requirements-dev.txt
         
     - name: Lint with flake8
