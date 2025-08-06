@@ -12,15 +12,21 @@ from datetime import datetime
 # Add backend directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+# Set up environment variables for testing before any imports
+# This prevents main.py from failing during import due to missing LLM provider configuration
+os.environ.setdefault('OLLAMA_URL', 'http://localhost:11434')
+os.environ.setdefault('ZHIPUAI_API_KEY', 'test-zhipu-key') 
+os.environ.setdefault('OPENAI_KEY', 'test-openai-key')
+
 
 @pytest.fixture
 def mock_environment():
     """Mock environment variables for testing."""
     env_vars = {
-        'OPENAI_API_KEY': 'test-openai-key',
+        'OPENAI_KEY': 'test-openai-key',
         'ANTHROPIC_API_KEY': 'test-anthropic-key', 
-        'ZHIPU_API_KEY': 'test-zhipu-key',
-        'OLLAMA_BASE_URL': 'http://localhost:11434',
+        'ZHIPUAI_API_KEY': 'test-zhipu-key',
+        'OLLAMA_URL': 'http://localhost:11434',
         'LOG_LEVEL': 'INFO',
     }
     

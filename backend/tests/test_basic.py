@@ -62,8 +62,8 @@ def test_pytest_fixtures(mock_environment):
     # This test uses the mock_environment fixture from conftest.py
     
     # Should have our mocked environment variables
-    assert mock_environment['OPENAI_API_KEY'] == 'test-openai-key'
-    assert mock_environment['ZHIPU_API_KEY'] == 'test-zhipu-key'
+    assert mock_environment['OPENAI_KEY'] == 'test-openai-key'
+    assert mock_environment['ZHIPUAI_API_KEY'] == 'test-zhipu-key'
 
 
 class TestBasicClass:
