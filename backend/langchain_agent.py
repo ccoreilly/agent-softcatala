@@ -602,7 +602,7 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             else:
                 self.agent_executor = prompt | new_model
                 
-            logger.info(f"Switched to model {model_name} from provider {provider}")
+            logger.info(f"Switched to model {model_name} from provider {provider} with agent executor type {type(self.agent_executor)}")
             
         except Exception as e:
             logger.error(f"Failed to switch model: {e}")
