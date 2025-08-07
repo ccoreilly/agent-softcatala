@@ -7,6 +7,7 @@ class CatalanSyllabificationTool(BaseTool):
     """Tool for splitting Catalan words into syllables using Softcatalà's hyphenation patterns"""
     
     def __init__(self):
+        super().__init__()
         # Hyphenation patterns extracted from Softcatalà's syllabification tool
         # These patterns are based on the TeX hyphenation algorithm by Franklin M. Liang
         self.patterns = self._load_patterns()

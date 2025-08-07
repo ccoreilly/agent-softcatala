@@ -6,6 +6,7 @@ class CatalanVerbsTool(BaseTool):
     """Tool for conjugating Catalan verbs using the Softcatalà conjugador API"""
     
     def __init__(self):
+        super().__init__()
         self.client = httpx.AsyncClient(
             timeout=30.0,
             headers={

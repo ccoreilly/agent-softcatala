@@ -6,6 +6,7 @@ class CatalanSynonymsTool(BaseTool):
     """Tool for searching Catalan synonyms using the Softcatalà dictionary API"""
     
     def __init__(self):
+        super().__init__()
         self.client = httpx.AsyncClient(
             timeout=30.0,
             headers={

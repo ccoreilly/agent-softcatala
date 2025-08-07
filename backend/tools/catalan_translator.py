@@ -6,6 +6,7 @@ class CatalanTranslatorTool(BaseTool):
     """Tool for translating text using Apertium-compatible translation APIs like Softcatalà"""
     
     def __init__(self):
+        super().__init__()
         self.client = httpx.AsyncClient(
             timeout=30.0,
             headers={

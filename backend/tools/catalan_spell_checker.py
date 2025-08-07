@@ -6,6 +6,7 @@ class CatalanSpellCheckerTool(BaseTool):
     """Tool for checking Catalan text for spelling and grammatical errors using the Softcatalà corrector API"""
     
     def __init__(self):
+        super().__init__()
         self.client = httpx.AsyncClient(
             timeout=30.0,
             headers={
