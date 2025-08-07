@@ -1,0 +1,28 @@
+name: Health Check
+
+on:
+  schedule:
+    # Run every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Ping Health Endpoint
+      run: |
+        echo "Pinging health endpoint..."
+        response=$(curl -s -o /dev/null -w "%{http_code}" https://agent-softcatala.onrender.com/health)
+        echo "Health check response code: $response"
+        
+        if [ "$response" -eq 200 ]; then
+          echo "✅ Health check passed"
+        else
+          echo "❌ Health check failed with status code: $response"
+          exit 1
+        fi
+    
+    - name: Log timestamp
+      run: echo "Health check completed at $(date -u)"
