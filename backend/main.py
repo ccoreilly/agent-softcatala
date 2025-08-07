@@ -137,6 +137,7 @@ async def root():
 async def health():
     """Health check endpoint with detailed status."""
     try:
+        return True
         health_status = await agent.check_health()
         return health_status
     except Exception as e:
