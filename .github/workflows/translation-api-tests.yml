@@ -1,0 +1,270 @@
+name: Translation API Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/tools/catalan_translator.py'
+      - 'backend/test_translation_api_integration.py'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/tools/catalan_translator.py'
+      - 'backend/test_translation_api_integration.py'
+  schedule:
+    # Run daily at 6 AM UTC to catch API changes
+    - cron: '0 6 * * *'
+
+jobs:
+  test-translation-apis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+        
+    - name: Install dependencies
+      run: |
+        cd backend
+        uv sync --dev
+    
+    - name: Test both Apertium and Neuronal APIs
+      run: |
+        cd backend
+        uv run python test_translation_api_integration.py
+      env:
+        # Set timeout for network requests
+        HTTPX_TIMEOUT: 30
+    
+    - name: Test individual API endpoints
+      run: |
+        cd backend
+        echo "Testing Apertium API endpoint..."
+        uv run python -c "
+import asyncio
+from tools.catalan_translator import CatalanTranslatorTool
+
+async def test_apertium():
+    tool = CatalanTranslatorTool()
+    result = await tool.execute(text='Hola món', langpair='cat|spa')
+    print(f'Apertium test: {result.get(\"success\", False)}')
+    if result.get('success'):
+        print(f'Translated: {result[\"translated_text\"]}')
+        print(f'Service: {result[\"service\"]}')
+    else:
+        print(f'Error: {result.get(\"error\", \"Unknown\")}')
+        exit(1)
+
+asyncio.run(test_apertium())
+"
+        
+        echo "Testing Neuronal API endpoint..."  
+        uv run python -c "
+import asyncio
+from tools.catalan_translator import CatalanTranslatorTool
+
+async def test_neuronal():
+    tool = CatalanTranslatorTool()
+    result = await tool.execute(text='Hello world', langpair='en|cat')
+    print(f'Neuronal test: {result.get(\"success\", False)}')
+    if result.get('success'):
+        print(f'Translated: {result[\"translated_text\"]}')
+        print(f'Service: {result[\"service\"]}')
+    else:
+        print(f'Error: {result.get(\"error\", \"Unknown\")}')
+        exit(1)
+
+asyncio.run(test_neuronal())
+"
+
+  test-language-pairs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+        
+    - name: Install dependencies
+      run: |
+        cd backend
+        uv sync --dev
+    
+    - name: Test Neuronal API language pairs
+      run: |
+        cd backend
+        echo "Testing neuronal-only language pairs..."
+        uv run python -c "
+import asyncio
+from tools.catalan_translator import CatalanTranslatorTool
+
+async def test_neuronal_pairs():
+    tool = CatalanTranslatorTool()
+    neuronal_pairs = [
+        ('deu|cat', 'Hallo', 'German to Catalan'),
+        ('cat|deu', 'Hola', 'Catalan to German'),
+        ('ita|cat', 'Ciao', 'Italian to Catalan'),
+        ('cat|ita', 'Hola', 'Catalan to Italian'),
+        ('jpn|cat', 'こんにちは', 'Japanese to Catalan'),
+        ('cat|jpn', 'Hola', 'Catalan to Japanese'),
+        ('eus|cat', 'Kaixo', 'Basque to Catalan'),
+        ('cat|eus', 'Hola', 'Catalan to Basque')
+    ]
+    
+    successful = 0
+    total = len(neuronal_pairs)
+    
+    for langpair, text, desc in neuronal_pairs:
+        print(f'Testing {desc} ({langpair}): \"{text}\"')
+        try:
+            result = await tool.execute(text=text, langpair=langpair)
+            if result.get('success'):
+                print(f'  ✅ {result[\"translated_text\"]} via {result[\"service\"]}')
+                successful += 1
+            else:
+                print(f'  ❌ Error: {result.get(\"error\", \"Unknown\")}')
+        except Exception as e:
+            print(f'  ❌ Exception: {str(e)}')
+    
+    print(f'Neuronal pairs: {successful}/{total} successful')
+    if successful < total:
+        exit(1)
+
+asyncio.run(test_neuronal_pairs())
+"
+    
+    - name: Test Apertium API language pairs
+      run: |
+        cd backend
+        echo "Testing apertium language pairs..."
+        uv run python -c "
+import asyncio
+from tools.catalan_translator import CatalanTranslatorTool
+
+async def test_apertium_pairs():
+    tool = CatalanTranslatorTool()
+    apertium_pairs = [
+        ('spa|cat', 'Hola mundo', 'Spanish to Catalan'),
+        ('cat|spa', 'Hola món', 'Catalan to Spanish'),
+        ('cat|oc_aran', 'Bon dia', 'Catalan to Aranese'),
+        ('oc_aran|cat', 'Bon dia', 'Aranese to Catalan'),
+        ('spa|cat_valencia', 'Buenos días', 'Spanish to Valencian'),
+    ]
+    
+    successful = 0
+    total = len(apertium_pairs)
+    
+    for langpair, text, desc in apertium_pairs:
+        print(f'Testing {desc} ({langpair}): \"{text}\"')
+        try:
+            result = await tool.execute(text=text, langpair=langpair)
+            if result.get('success'):
+                print(f'  ✅ {result[\"translated_text\"]} via {result[\"service\"]}')
+                successful += 1
+            else:
+                print(f'  ❌ Error: {result.get(\"error\", \"Unknown\")}')
+        except Exception as e:
+            print(f'  ❌ Exception: {str(e)}')
+    
+    print(f'Apertium pairs: {successful}/{total} successful')
+    if successful < total:
+        exit(1)
+
+asyncio.run(test_apertium_pairs())
+"
+
+  test-hybrid-pairs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "latest"
+        
+    - name: Install dependencies
+      run: |
+        cd backend
+        uv sync --dev
+    
+    - name: Test hybrid language pairs (prefer neuronal)
+      run: |
+        cd backend
+        echo "Testing language pairs available in both APIs (should prefer neuronal)..."
+        uv run python -c "
+import asyncio
+from tools.catalan_translator import CatalanTranslatorTool
+
+async def test_hybrid_pairs():
+    tool = CatalanTranslatorTool()
+    # These languages have both translators but should prefer neuronal
+    hybrid_pairs = [
+        ('en|cat', 'Hello world', 'English to Catalan'),
+        ('cat|en', 'Hola món', 'Catalan to English'),
+        ('fr|cat', 'Bonjour', 'French to Catalan'),
+        ('cat|fr', 'Hola món', 'Catalan to French'),
+        ('pt|cat', 'Olá mundo', 'Portuguese to Catalan'),
+        ('cat|pt', 'Hola món', 'Catalan to Portuguese'),
+    ]
+    
+    successful = 0
+    total = len(hybrid_pairs)
+    
+    for langpair, text, desc in hybrid_pairs:
+        print(f'Testing {desc} ({langpair}): \"{text}\"')
+        try:
+            # Verify it chooses neuronal
+            should_use_neuronal = tool._should_use_neuronal(langpair)
+            if not should_use_neuronal:
+                print(f'  ❌ Expected neuronal API but got apertium for {langpair}')
+                continue
+                
+            result = await tool.execute(text=text, langpair=langpair)
+            if result.get('success'):
+                service = result['service']
+                if 'Neuronal' in service:
+                    print(f'  ✅ {result[\"translated_text\"]} via {service}')
+                    successful += 1
+                else:
+                    print(f'  ❌ Expected Neuronal API but got {service}')
+            else:
+                print(f'  ❌ Error: {result.get(\"error\", \"Unknown\")}')
+        except Exception as e:
+            print(f'  ❌ Exception: {str(e)}')
+    
+    print(f'Hybrid pairs (neuronal): {successful}/{total} successful')
+    if successful < total:
+        exit(1)
+
+asyncio.run(test_hybrid_pairs())
+"
