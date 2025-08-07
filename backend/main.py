@@ -10,6 +10,7 @@ import asyncio
 from dotenv import load_dotenv
 
 from langchain_agent import LangChainAgent
+from models.model_manager import ModelManager
 from tools.catalan_synonyms import CatalanSynonymsTool
 from tools.catalan_spell_checker import CatalanSpellCheckerTool
 from tools.catalan_verbs import CatalanVerbsTool
@@ -34,30 +35,21 @@ else:
 # Validate that at least one LLM provider is configured
 def validate_providers():
     """Validate that at least one LLM provider is properly configured."""
-    ollama_url = os.getenv("OLLAMA_URL")
-    zhipu_api_key = os.getenv("ZHIPUAI_API_KEY")
-    openai_key = os.getenv("OPENAI_KEY")
+    # Create a temporary ModelManager to check available providers
+    temp_model_manager = ModelManager()
     
-    if not ollama_url and not zhipu_api_key and not openai_key:
+    if not temp_model_manager.providers:
+        required_env_vars = temp_model_manager.get_required_env_vars()
         error_msg = (
-            "No LLM providers configured. Please set at least one of:\n"
-            "- OLLAMA_URL (for Ollama provider)\n"
-            "- ZHIPUAI_API_KEY (for Zhipu AI provider)\n"
-            "- OPENAI_KEY (for OpenAI provider)"
+            f"No LLM providers configured. Please set at least one of:\n"
+            + "\n".join(f"- {var}" for var in required_env_vars)
         )
         logger.error(error_msg)
         raise RuntimeError(error_msg)
     
     # Log which providers are configured
-    configured_providers = []
-    if ollama_url:
-        configured_providers.append(f"Ollama ({ollama_url})")
-    if zhipu_api_key:
-        configured_providers.append("Zhipu AI")
-    if openai_key:
-        configured_providers.append("OpenAI")
-    
-    logger.info(f"Configured providers: {', '.join(configured_providers)}")
+    provider_names = temp_model_manager.get_configured_provider_names()
+    logger.info(f"Configured providers: {', '.join(provider_names)}")
 
 # Validate providers before starting the application
 validate_providers()

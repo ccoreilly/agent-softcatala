@@ -73,38 +73,51 @@ class OpenRouterProvider(BaseProvider):
     
     # Models that support native function calling
     NATIVE_FUNCTION_CALLING_MODELS = {
-        # Anthropic models (excellent tool support)
-        "anthropic/claude-3-5-sonnet",
-        "anthropic/claude-3-5-haiku", 
-        "anthropic/claude-3-haiku",
-        "anthropic/claude-3-sonnet",
-        "anthropic/claude-3-opus",
+        # # Anthropic models (excellent tool support)
+        # "anthropic/claude-3-5-sonnet",
+        # "anthropic/claude-3-5-haiku", 
+        # "anthropic/claude-3-haiku",
+        # "anthropic/claude-3-sonnet",
+        # "anthropic/claude-3-opus",
         
-        # OpenAI models (excellent tool support)
-        "openai/gpt-4o",
-        "openai/gpt-4o-mini",
-        "openai/gpt-4-turbo",
-        "openai/gpt-4",
-        "openai/gpt-3.5-turbo",
+        # # OpenAI models (excellent tool support)
+        # "openai/gpt-4o",
+        # "openai/gpt-4o-mini",
+        # "openai/gpt-4-turbo",
+        # "openai/gpt-4",
+        # "openai/gpt-3.5-turbo",
+        # "openai/gpt-oss-20b:free",
         
-        # Google models (good tool support)
-        "google/gemini-pro-1.5",
-        "google/gemini-flash-1.5",
-        "google/gemini-2.0-flash-exp",
+        # # Google models (good tool support)
+        # "google/gemini-pro-1.5",
+        # "google/gemini-flash-1.5",
+        # "google/gemini-2.0-flash-exp",
         
-        # Meta models (some tool support)
-        "meta-llama/llama-3.1-405b-instruct",
-        "meta-llama/llama-3.1-70b-instruct",
-        "meta-llama/llama-3.1-8b-instruct",
+        # # Meta models (some tool support)
+        # "meta-llama/llama-3.1-405b-instruct",
+        # "meta-llama/llama-3.1-70b-instruct",
+        # "meta-llama/llama-3.1-8b-instruct",
         
-        # Mistral models (good tool support)
-        "mistralai/mistral-large",
-        "mistralai/mixtral-8x7b-instruct",
-        "mistralai/mixtral-8x22b-instruct",
+        # # Mistral models (good tool support)
+        # "mistralai/mistral-large",
+        # "mistralai/mixtral-8x7b-instruct",
+        # "mistralai/mixtral-8x22b-instruct",
         
-        # Cohere models (good tool support)
-        "cohere/command-r-plus",
-        "cohere/command-r",
+        # # Cohere models (good tool support)
+        # "cohere/command-r-plus",
+        # "cohere/command-r",
+
+        # Disponibles
+        "openai/gpt-oss-20b:free",
+        "deepseek/deepseek-chat-v3-0324:free",
+        "google/gemini-2.0-flash-exp:free",
+        "qwen/qwen3-235b-a22b:free",
+        "qwen/qwen3-4b:free",
+        "meta-llama/llama-3.3-70b-instruct:free",
+        "mistralai/mistral-small-3.1-24b-instruct:free",
+        "mistralai/mistral-small-3.2-24b-instruct:free",
+        "mistralai/mistral-7b-instruct:free"
+
     }
     
     def __init__(self, api_key: str = None, base_url: str = None, site_url: str = None, site_name: str = None):
@@ -233,49 +246,70 @@ The following Python methods are available:
             List of available model names (both native and fallback supported)
         """
         return [
-            # Free models (great for testing, may need fallback function calling)
+            # # Free models (great for testing, may need fallback function calling)
+            # "google/gemma-3-27b-it:free",
+            # "google/gemini-flash-1.5:free",
+            # "mistralai/mistral-7b-instruct:free",
+            
+            # # Anthropic models (native tool support)
+            # "anthropic/claude-3-5-sonnet",
+            # "anthropic/claude-3-5-haiku", 
+            # "anthropic/claude-3-haiku",
+            # "anthropic/claude-3-sonnet",
+            # "anthropic/claude-3-opus",
+            
+            # # OpenAI models (native tool support)
+            # "openai/gpt-4o",
+            # "openai/gpt-4o-mini",
+            # "openai/gpt-4-turbo",
+            # "openai/gpt-4",
+            # "openai/gpt-3.5-turbo",
+            # "openai/gpt-oss-20b:free",
+            
+            # # Google models (mixed support)
+            # "google/gemini-pro-1.5",
+            # "google/gemini-flash-1.5",
+            # "google/gemini-2.0-flash-exp",
+            
+            # # Meta models (fallback function calling)
+            # "meta-llama/llama-3.1-405b-instruct",
+            # "meta-llama/llama-3.1-70b-instruct",
+            # "meta-llama/llama-3.1-8b-instruct",
+            
+            # # Mistral models (native tool support)
+            # "mistralai/mistral-large",
+            # "mistralai/mixtral-8x7b-instruct",
+            # "mistralai/mixtral-8x22b-instruct",
+            
+            # # Cohere models (native tool support)
+            # "cohere/command-r-plus",
+            # "cohere/command-r",
+            
+            # # Other popular models (fallback function calling)
+            # "qwen/qwen-2.5-72b-instruct",
+            # "deepseek/deepseek-coder",
+            # "perplexity/llama-3.1-sonar-large-128k-online",
+            # "perplexity/llama-3.1-sonar-small-128k-online"
+            
+            # Disponibles
             "google/gemma-3-27b-it:free",
-            "google/gemini-flash-1.5:free",
-            "mistralai/mistral-7b-instruct:free",
-            
-            # Anthropic models (native tool support)
-            "anthropic/claude-3-5-sonnet",
-            "anthropic/claude-3-5-haiku", 
-            "anthropic/claude-3-haiku",
-            "anthropic/claude-3-sonnet",
-            "anthropic/claude-3-opus",
-            
-            # OpenAI models (native tool support)
-            "openai/gpt-4o",
-            "openai/gpt-4o-mini",
-            "openai/gpt-4-turbo",
-            "openai/gpt-4",
-            "openai/gpt-3.5-turbo",
-            
-            # Google models (mixed support)
-            "google/gemini-pro-1.5",
-            "google/gemini-flash-1.5",
-            "google/gemini-2.0-flash-exp",
-            
-            # Meta models (fallback function calling)
-            "meta-llama/llama-3.1-405b-instruct",
-            "meta-llama/llama-3.1-70b-instruct",
-            "meta-llama/llama-3.1-8b-instruct",
-            
-            # Mistral models (native tool support)
-            "mistralai/mistral-large",
-            "mistralai/mixtral-8x7b-instruct",
-            "mistralai/mixtral-8x22b-instruct",
-            
-            # Cohere models (native tool support)
-            "cohere/command-r-plus",
-            "cohere/command-r",
-            
-            # Other popular models (fallback function calling)
-            "qwen/qwen-2.5-72b-instruct",
-            "deepseek/deepseek-coder",
-            "perplexity/llama-3.1-sonar-large-128k-online",
-            "perplexity/llama-3.1-sonar-small-128k-online"
+            "google/gemma-3n-e2b-it:free",
+            "openai/gpt-oss-20b:free",
+            "z-ai/glm-4.5-air:free",
+            "moonshotai/kimi-k2:free",
+            "deepseek/deepseek-chat-v3-0324:free",
+            "deepseek/deepseek-r1-0528-qwen3-8b:free",
+            "deepseek/deepseek-r1-0528:free",
+            "google/gemini-2.0-flash-exp:free",
+            "qwen/qwen3-4b:free",
+            "qwen/qwen3-8b:free",
+            "qwen/qwen3-14b:free",
+            "qwen/qwen3-30b-a3b:free",
+            "qwen/qwen3-235b-a22b:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "mistralai/mistral-small-3.1-24b-instruct:free",
+            "mistralai/mistral-small-3.2-24b-instruct:free",
+            "mistralai/mistral-7b-instruct:free"
         ]
     
     def get_default_model(self) -> BaseChatModel:

@@ -189,6 +189,19 @@ class ModelManager:
         
         raise ValueError("No providers available for default model")
     
+    def get_required_env_vars(self) -> List[str]:
+        """Get list of environment variables that could configure providers."""
+        return [
+            "OLLAMA_URL (for Ollama provider)",
+            "ZHIPUAI_API_KEY (for Zhipu AI provider)", 
+            "OPENAI_KEY (for OpenAI provider)",
+            "OPENROUTER_API_KEY (for OpenRouter provider)"
+        ]
+    
+    def get_configured_provider_names(self) -> List[str]:
+        """Get list of successfully configured provider names."""
+        return [provider_enum.value.title() for provider_enum in self.providers.keys()]
+    
     async def health_check(self) -> Dict[str, Any]:
         """Check the health of all providers."""
         health_status = {}

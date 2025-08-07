@@ -58,6 +58,8 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("history", self.history_command))
         self.application.add_handler(CommandHandler("status", self.status_command))
         self.application.add_handler(CommandHandler("debug", self.debug_command))
+        self.application.add_handler(CommandHandler("models", self.models_command))
+        self.application.add_handler(CommandHandler("model", self.model_command))
         
         # Message handler for regular text messages
         self.application.add_handler(
@@ -82,7 +84,9 @@ class TelegramBot:
             "/clear - Esborra l'historial de conversa\n"
             "/history - Mostra estadístiques de conversa\n"
             "/status - Comprova l'estat del bot i l'IA\n"
-            "/debug - Activa/desactiva el mode debug\n\n"
+            "/debug - Activa/desactiva el mode debug\n"
+            "/models - Mostra models disponibles\n"
+            "/model [proveïdor] [model] - Canvia el model d'IA\n\n"
             "Simplement envia'm un missatge i l'Agent de Softcatalà farà el seu millor per ajudar-te! 🚀"
         )
         
@@ -99,7 +103,9 @@ class TelegramBot:
             "/clear - Esborra el teu historial de conversa\n"
             "/history - Mostra estadístiques de conversa\n"
             "/status - Comprova l'estat del bot i el model d'IA\n"
-            "/debug - Activa/desactiva el mode debug detallat\n\n"
+            "/debug - Activa/desactiva el mode debug detallat\n"
+            "/models - Llista tots els models d'IA disponibles\n"
+            "/model [proveïdor] [model] - Canvia el model d'IA actual\n\n"
             "*Com utilitzar-lo:*\n"
             "Simplement envia qualsevol missatge i l'Agent de Softcatalà respondrà utilitzant capacitats d'IA avançades.\n"
             "L'Agent pot navegar per la web, cercar a Wikipedia, respondre preguntes, ajudar amb codi, i més!\n\n"
@@ -211,6 +217,82 @@ class TelegramBot:
         
         await update.message.reply_text(debug_message, parse_mode=ParseMode.MARKDOWN)
         logger.info(f"Debug mode {'enabled' if new_debug else 'disabled'} for chat {chat_id}")
+    
+    async def models_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /models command to list available models."""
+        try:
+            models_info = await self.agent.get_available_models()
+            
+            models_message = "🧠 *Models d'IA Disponibles*\n\n"
+            
+            for provider, models in models_info.items():
+                if models:  # Only show providers that have models
+                    models_message += f"*{provider.upper()}:*\n"
+                    for model in models:
+                        models_message += f"• `{model}`\n"
+                    models_message += "\n"
+            
+            if not any(models for models in models_info.values()):
+                models_message += "❌ No hi ha models disponibles actualment.\n"
+            else:
+                models_message += "💡 *Ús:* `/model [proveïdor] [model]`\n"
+                models_message += "📌 *Exemple:* `/model openrouter openai/gpt-oss-20b:free`"
+            
+        except Exception as e:
+            models_message = f"❌ *Error obtenint la llista de models:*\n{str(e)}"
+            logger.error(f"Error in models command: {e}")
+        
+        await update.message.reply_text(models_message, parse_mode=ParseMode.MARKDOWN)
+    
+    async def model_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /model command to switch models."""
+        try:
+            # Parse arguments
+            if not context.args or len(context.args) < 2:
+                help_message = (
+                    "🔧 *Canvi de Model*\n\n"
+                    "*Ús:* `/model [proveïdor] [model]`\n\n"
+                    "*Exemples:*\n"
+                    "• `/model openrouter openai/gpt-oss-20b:free`\n"
+                    "• `/model openai gpt-4o-mini`\n"
+                    "• `/model ollama llama3.2`\n\n"
+                    "📝 *Consell:* Utilitza `/models` per veure tots els models disponibles."
+                )
+                await update.message.reply_text(help_message, parse_mode=ParseMode.MARKDOWN)
+                return
+            
+            provider = context.args[0].lower()
+            model_name = context.args[1]
+            
+            # Try to switch the model
+            self.agent.switch_model(provider, model_name)
+            
+            success_message = (
+                f"✅ *Model canviat correctament!*\n\n"
+                f"🔧 **Proveïdor:** `{provider}`\n"
+                f"🧠 **Model:** `{model_name}`\n\n"
+                f"Ara pots començar a fer preguntes amb el nou model. 🚀"
+            )
+            
+            await update.message.reply_text(success_message, parse_mode=ParseMode.MARKDOWN)
+            logger.info(f"Model switched to {provider}/{model_name} for chat {update.effective_chat.id}")
+            
+        except ValueError as e:
+            error_message = (
+                f"❌ *Error de configuració:*\n"
+                f"`{str(e)}`\n\n"
+                f"💡 Utilitza `/models` per veure els proveïdors i models disponibles."
+            )
+            await update.message.reply_text(error_message, parse_mode=ParseMode.MARKDOWN)
+            
+        except Exception as e:
+            error_message = (
+                f"❌ *Error canviant el model:*\n"
+                f"`{str(e)}`\n\n"
+                f"🔄 Si us plau, torna-ho a intentar o utilitza `/models` per veure opcions vàlides."
+            )
+            logger.error(f"Error in model command: {e}")
+            await update.message.reply_text(error_message, parse_mode=ParseMode.MARKDOWN)
     
     def _escape_markdown_v2(self, text: str) -> str:
         """
