@@ -13,40 +13,83 @@ class CatalanTranslatorTool(BaseTool):
                 'Accept': 'application/json'
             }
         )
-        # API Configuration for Softcatalà translation service
-        # To use the real Softcatalà API, update this URL when available:
-        # Example: self.base_url = "https://www.softcatala.org/api/translate"
-        #          or "https://api.softcatala.org/translate" 
-        # Currently using mock service for demonstration
-        self.base_url = "https://apertium.ua.es/tradtexto.php"
+        # API endpoints
+        self.apertium_url = "https://www.softcatala.org/api/traductor/translate"
+        self.neuronal_url = "https://api.softcatala.org/v2/nmt/translate/"
+        self.apertium_key = "NmQ3NmMyNThmM2JjNWQxMjkxN2N"
         
-        # Supported language pairs (based on Softcatalà documentation)
-        self.language_pairs = {
-            'ca|es': 'Català ➝ Castellà/Espanyol',
-            'es|ca': 'Castellà/Espanyol ➝ Català', 
-            'ca|en': 'Català ➝ Anglès',
-            'en|ca': 'Anglès ➝ Català',
-            'ca|fr': 'Català ➝ Francès',
-            'fr|ca': 'Francès ➝ Català',
-            'ca|it': 'Català ➝ Italià',
-            'it|ca': 'Italià ➝ Català',
-            'ca|pt': 'Català ➝ Portuguès',
-            'pt|ca': 'Portuguès ➝ Català',
-            'ca|de': 'Català ➝ Alemany',
-            'de|ca': 'Alemany ➝ Català',
-            'ca|eu': 'Català ➝ Basc',
-            'eu|ca': 'Basc ➝ Català',
-            'ca|gl': 'Català ➝ Gallec',
-            'gl|ca': 'Gallec ➝ Català',
-            'ca|oc': 'Català ➝ Occità',
-            'oc|ca': 'Occità ➝ Català'
+        # Language codes mapping
+        self.language_names = {
+            'en': 'anglès',
+            'deu': 'alemany', 
+            'cat': 'català',
+            'spa': 'castellà',
+            'oc_aran': 'occità/aranès',
+            'oci': 'occità/llenguadoc',
+            'ron': 'romanès',
+            'arg': 'aragonès',
+            'fr': 'francès',
+            'pt': 'portuguès',
+            'nld': 'neerlandès',
+            'ita': 'italià',
+            'jpn': 'japonès',
+            'glg': 'gallec',
+            'eus': 'basc',
+            'cat_valencia': 'català valencià'
         }
+        
+        # Languages supported by neuronal translator
+        self.neuronal_langs = ["en", "deu", "ita", "nld", "fr", "pt", "jpn", "glg", "oci", "eus"]
+        
+        # Languages with both translators available
+        self.langs_with_both = ["en", "fr", "pt"]
+        
+        # Languages only available on neuronal
+        self.langs_only_neuronal = ["deu", "ita", "nld", "jpn", "glg", "oci", "eus"]
+        
+        # Generate supported language pairs
+        self.language_pairs = self._generate_language_pairs()
+    
+    def _generate_language_pairs(self) -> Dict[str, str]:
+        """Generate supported language pairs based on API capabilities"""
+        pairs = {}
+        
+        # All supported languages can translate to/from Catalan
+        for lang_code, lang_name in self.language_names.items():
+            if lang_code == 'cat':
+                continue
+            if lang_code == 'cat_valencia':
+                # Special case: Valencian Catalan is only a target language
+                pairs['spa|cat_valencia'] = 'Castellà ➝ Català valencià'
+                continue
+                
+            # From Catalan to other language
+            pairs[f'cat|{lang_code}'] = f'Català ➝ {lang_name.title()}'
+            # From other language to Catalan
+            pairs[f'{lang_code}|cat'] = f'{lang_name.title()} ➝ Català'
+        
+        return pairs
+    
+    def _should_use_neuronal(self, langpair: str) -> bool:
+        """Determine whether to use neuronal or apertium API based on language pair"""
+        source, target = langpair.split('|')
+        
+        # If either language is only available on neuronal, use neuronal
+        if source in self.langs_only_neuronal or target in self.langs_only_neuronal:
+            return True
+            
+        # For languages with both translators, prefer neuronal (better quality)
+        if source in self.langs_with_both or target in self.langs_with_both:
+            return True
+            
+        # Default to apertium for other cases
+        return False
     
     @property
     def definition(self) -> ToolDefinition:
         return ToolDefinition(
             name="catalan_translator",
-            description="Translate text between Catalan and other languages using Softcatalà-compatible translation services. Supports translation between Catalan and Spanish, English, French, Italian, Portuguese, German, Basque, Galician, and Occitan.",
+            description="Translate text between Catalan and other languages using Softcatalà translation services (Apertium and Neuronal APIs). Supports translation between Catalan and: Spanish, English, French, Italian, Portuguese, German, Dutch, Japanese, Galician, Basque, Occitan (Aranese and Languedoc), Romanian, and Aragonese. Also supports Spanish to Valencian Catalan.",
             parameters=[
                 ToolParameter(
                     name="text",
@@ -57,7 +100,7 @@ class CatalanTranslatorTool(BaseTool):
                 ToolParameter(
                     name="langpair",
                     type="string", 
-                    description="Language pair in format 'source|target' (e.g., 'en|ca' for English to Catalan, 'ca|es' for Catalan to Spanish). Supported pairs: ca|es, es|ca, ca|en, en|ca, ca|fr, fr|ca, ca|it, it|ca, ca|pt, pt|ca, ca|de, de|ca, ca|eu, eu|ca, ca|gl, gl|ca, ca|oc, oc|ca",
+                    description="Language pair in format 'source|target' (e.g., 'en|cat' for English to Catalan, 'cat|spa' for Catalan to Spanish). Use language codes: cat (Catalan), spa (Spanish), en (English), fr (French), pt (Portuguese), deu (German), ita (Italian), nld (Dutch), jpn (Japanese), glg (Galician), eus (Basque), oci (Occitan/Languedoc), oc_aran (Occitan/Aranese), ron (Romanian), arg (Aragonese), cat_valencia (Valencian Catalan - target only from Spanish)",
                     required=True
                 ),
                 ToolParameter(
@@ -75,7 +118,7 @@ class CatalanTranslatorTool(BaseTool):
         """Catalan version of the tool definition for use with Catalan prompts"""
         return ToolDefinition(
             name="catalan_translator",
-            description="Tradueix text entre el català i altres llengües utilitzant serveis de traducció compatibles amb Softcatalà. Suporta la traducció entre català i castellà, anglès, francès, italià, portuguès, alemany, basc, gallec i occità.",
+            description="Tradueix text entre el català i altres llengües utilitzant els serveis de traducció de Softcatalà (APIs Apertium i Neuronal). Suporta la traducció entre català i: castellà, anglès, francès, italià, portuguès, alemany, neerlandès, japonès, gallec, basc, occità (aranès i llenguadocià), romanès i aragonès. També suporta castellà a català valencià.",
             parameters=[
                 ToolParameter(
                     name="text",
@@ -86,7 +129,7 @@ class CatalanTranslatorTool(BaseTool):
                 ToolParameter(
                     name="langpair", 
                     type="string",
-                    description="Parell de llengües en format 'origen|destí' (p.ex., 'en|ca' per anglès a català, 'ca|es' per català a castellà). Parells suportats: ca|es, es|ca, ca|en, en|ca, ca|fr, fr|ca, ca|it, it|ca, ca|pt, pt|ca, ca|de, de|ca, ca|eu, eu|ca, ca|gl, gl|ca, ca|oc, oc|ca",
+                    description="Parell de llengües en format 'origen|destí' (p.ex., 'en|cat' per anglès a català, 'cat|spa' per català a castellà). Codis de llengua: cat (català), spa (castellà), en (anglès), fr (francès), pt (portuguès), deu (alemany), ita (italià), nld (neerlandès), jpn (japonès), glg (gallec), eus (basc), oci (occità/llenguadoc), oc_aran (occità/aranès), ron (romanès), arg (aragonès), cat_valencia (català valencià - només destí des del castellà)",
                     required=True
                 ),
                 ToolParameter(
@@ -144,95 +187,14 @@ class CatalanTranslatorTool(BaseTool):
             }
     
     async def _translate(self, text: str, langpair: str, format_type: str) -> Dict[str, Any]:
-        """Perform the actual translation using the Apertium-compatible API"""
+        """Perform the actual translation using Softcatalà's APIs"""
         try:
-            # CONFIGURATION: How to enable real Softcatalà translation API
-            # ========================================================
-            # When Softcatalà's public API becomes available, replace the mock 
-            # translation code below with real API calls. The expected format is:
-            # 
-            # params = {'langpair': langpair, 'q': text}
-            # if format_type != 'txt': params['format'] = format_type
-            # response = await self.client.get(self.base_url, params=params)
-            # data = response.json()
-            # translated_text = data['responseData']['translatedText']
-            # 
-            # For demonstration purposes, provide a mock translation service
-            # In a real implementation, this would connect to Softcatalà's API
-            # when available, or another Apertium-compatible service
+            use_neuronal = self._should_use_neuronal(langpair)
             
-            # Simple mock translations for demonstration
-            mock_translations = {
-                'en|ca': {
-                    'hello': 'hola',
-                    'world': 'món', 
-                    'hello world': 'hola món',
-                    'good morning': 'bon dia',
-                    'thank you': 'gràcies',
-                    'please': 'si us plau',
-                    'how are you?': 'com estàs?',
-                    'i am fine': 'estic bé'
-                },
-                'ca|es': {
-                    'hola': 'hola',
-                    'món': 'mundo',
-                    'hola món': 'hola mundo',
-                    'bon dia': 'buenos días',
-                    'gràcies': 'gracias', 
-                    'si us plau': 'por favor',
-                    'com estàs?': '¿cómo estás?',
-                    'estic bé': 'estoy bien'
-                },
-                'es|ca': {
-                    'hola': 'hola',
-                    'mundo': 'món',
-                    'hola mundo': 'hola món',
-                    'buenos días': 'bon dia',
-                    'gracias': 'gràcies',
-                    'por favor': 'si us plau',
-                    '¿cómo estás?': 'com estàs?',
-                    'estoy bien': 'estic bé'
-                },
-                'ca|en': {
-                    'hola': 'hello',
-                    'món': 'world',
-                    'hola món': 'hello world',
-                    'bon dia': 'good morning',
-                    'gràcies': 'thank you',
-                    'si us plau': 'please',
-                    'com estàs?': 'how are you?',
-                    'estic bé': 'i am fine'
-                }
-            }
-            
-            # Get translations for the language pair
-            translations = mock_translations.get(langpair, {})
-            translated_text = translations.get(text.lower(), None)
-            
-            if translated_text:
-                return {
-                    'success': True,
-                    'original_text': text,
-                    'translated_text': translated_text,
-                    'language_pair': langpair,
-                    'language_pair_description': self.language_pairs[langpair],
-                    'service': 'Mock Translation Service (Demo)',
-                    'format': format_type,
-                    'note': 'Aquesta és una traducció de demostració. Per a l\'ús real, cal configurar un servei d\'API de traducció compatible amb Softcatalà/Apertium.'
-                }
+            if use_neuronal:
+                return await self._translate_neuronal(text, langpair, format_type)
             else:
-                # For unknown phrases, provide a fallback message
-                fallback_msg = f"[Traducció no disponible en el servei de demostració per: '{text}']"
-                return {
-                    'success': True,
-                    'original_text': text,
-                    'translated_text': fallback_msg,
-                    'language_pair': langpair,
-                    'language_pair_description': self.language_pairs[langpair],
-                    'service': 'Mock Translation Service (Demo)',
-                    'format': format_type,
-                    'note': 'Traducció de demostració limitada. Configureu un servei real per a millors resultats.'
-                }
+                return await self._translate_apertium(text, langpair, format_type)
                 
         except Exception as e:
             return {
@@ -241,24 +203,116 @@ class CatalanTranslatorTool(BaseTool):
                 'error_en': f'Unexpected error: {str(e)}'
             }
     
+    async def _translate_apertium(self, text: str, langpair: str, format_type: str) -> Dict[str, Any]:
+        """Translate using the Apertium API"""
+        try:
+            body = {
+                'langpair': langpair,
+                'q': text,
+                'markUnknown': 'false',
+                'key': self.apertium_key
+            }
+            
+            if format_type != 'txt':
+                body['format'] = format_type
+                
+            response = await self.client.post(self.apertium_url, json=body)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'responseData' in data and 'translatedText' in data['responseData']:
+                translated_text = data['responseData']['translatedText']
+                
+                return {
+                    'success': True,
+                    'original_text': text,
+                    'translated_text': translated_text,
+                    'language_pair': langpair,
+                    'language_pair_description': self.language_pairs.get(langpair, langpair),
+                    'service': 'Softcatalà Apertium API',
+                    'format': format_type
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Format de resposta API inesperat',
+                    'error_en': 'Unexpected API response format',
+                    'response': data
+                }
+                
+        except httpx.HTTPStatusError as e:
+            return {
+                'success': False,
+                'error': f'Error HTTP de l\'API: {e.response.status_code}',
+                'error_en': f'API HTTP error: {e.response.status_code}',
+                'details': e.response.text if hasattr(e.response, 'text') else str(e)
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Error de l\'API Apertium: {str(e)}',
+                'error_en': f'Apertium API error: {str(e)}'
+            }
+    
+    async def _translate_neuronal(self, text: str, langpair: str, format_type: str) -> Dict[str, Any]:
+        """Translate using the Neuronal API"""
+        try:
+            body = {
+                'langpair': langpair,
+                'q': text,
+                'savetext': 'false'
+            }
+            
+            response = await self.client.post(self.neuronal_url, json=body)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'responseData' in data and 'translatedText' in data['responseData']:
+                translated_text = data['responseData']['translatedText']
+                
+                return {
+                    'success': True,
+                    'original_text': text,
+                    'translated_text': translated_text,
+                    'language_pair': langpair,
+                    'language_pair_description': self.language_pairs.get(langpair, langpair),
+                    'service': 'Softcatalà Neuronal API',
+                    'format': format_type
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Format de resposta API inesperat',
+                    'error_en': 'Unexpected API response format',
+                    'response': data
+                }
+                
+        except httpx.HTTPStatusError as e:
+            return {
+                'success': False,
+                'error': f'Error HTTP de l\'API: {e.response.status_code}',
+                'error_en': f'API HTTP error: {e.response.status_code}',
+                'details': e.response.text if hasattr(e.response, 'text') else str(e)
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Error de l\'API Neuronal: {str(e)}',
+                'error_en': f'Neuronal API error: {str(e)}'
+            }
+    
     async def get_supported_languages(self) -> Dict[str, Any]:
         """Get list of supported language pairs"""
         return {
             'success': True,
             'supported_pairs': self.language_pairs,
             'total_pairs': len(self.language_pairs),
-            'languages': {
-                'ca': 'Català / Catalan',
-                'es': 'Castellà/Espanyol / Spanish', 
-                'en': 'Anglès / English',
-                'fr': 'Francès / French',
-                'it': 'Italià / Italian',
-                'pt': 'Portuguès / Portuguese',
-                'de': 'Alemany / German',
-                'eu': 'Basc / Basque',
-                'gl': 'Gallec / Galician',
-                'oc': 'Occità / Occitan'
-            }
+            'languages': self.language_names,
+            'neuronal_supported': self.neuronal_langs,
+            'both_translators': self.langs_with_both,
+            'neuronal_only': self.langs_only_neuronal
         }
     
     def __del__(self):
