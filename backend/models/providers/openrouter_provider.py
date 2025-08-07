@@ -108,7 +108,7 @@ class OpenRouterProvider(BaseProvider):
         # "cohere/command-r",
 
         # Disponibles
-        "openai/gpt-oss-20b:free",
+        "openai/gpt-oss-20b",
         "deepseek/deepseek-chat-v3-0324:free",
         "google/gemini-2.0-flash-exp:free",
         "qwen/qwen3-235b-a22b:free",
@@ -294,6 +294,7 @@ The following Python methods are available:
             # Disponibles
             "google/gemma-3-27b-it:free",
             "google/gemma-3n-e2b-it:free",
+            "openai/gpt-oss-20b",
             "openai/gpt-oss-20b:free",
             "z-ai/glm-4.5-air:free",
             "moonshotai/kimi-k2:free",
@@ -319,7 +320,7 @@ The following Python methods are available:
             ChatOpenRouter instance with google/gemma-3-27b-it:free as default model
         """
         # Use Gemma 3 as default - free and supports fallback function calling
-        return self.get_model("openai/gpt-oss-20b:free")
+        return self.get_model("openai/gpt-oss-20b")
     
     async def health_check(self) -> Dict[str, Any]:
         """Check OpenRouter API health.
