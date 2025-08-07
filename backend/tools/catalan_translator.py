@@ -197,6 +197,7 @@ class CatalanTranslatorTool(BaseTool):
                 return await self._translate_apertium(text, langpair, format_type)
                 
         except Exception as e:
+            self.logger.error(f"Error en la traducció: {str(e)}")
             return {
                 'success': False,
                 'error': f'Error inesperat: {str(e)}',
@@ -213,6 +214,8 @@ class CatalanTranslatorTool(BaseTool):
                 'key': self.apertium_key
             }
             
+            self.logger.info(f"Apertium API request: {body}")
+
             if format_type != 'txt':
                 body['format'] = format_type
                 
@@ -220,7 +223,9 @@ class CatalanTranslatorTool(BaseTool):
             response.raise_for_status()
             
             data = response.json()
-            
+
+            self.logger.info(f"Apertium API response: {data}")
+
             if 'responseData' in data and 'translatedText' in data['responseData']:
                 translated_text = data['responseData']['translatedText']
                 
@@ -264,10 +269,14 @@ class CatalanTranslatorTool(BaseTool):
                 'savetext': 'false'
             }
             
+            self.logger.info(f"Neuronal API request: {body}")
+
             response = await self.client.post(self.neuronal_url, json=body)
             response.raise_for_status()
             
             data = response.json()
+
+            self.logger.debug(f"Neuronal API response: {data}")
             
             if 'responseData' in data and 'translatedText' in data['responseData']:
                 translated_text = data['responseData']['translatedText']

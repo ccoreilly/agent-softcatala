@@ -1,6 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
+import logging
+import os
+
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 class ToolParameter(BaseModel):
     """Definition of a tool parameter"""
@@ -19,6 +27,9 @@ class ToolDefinition(BaseModel):
 class BaseTool(ABC):
     """Base class for all agent tools"""
     
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
     @property
     @abstractmethod
     def definition(self) -> ToolDefinition:

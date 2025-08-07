@@ -18,8 +18,9 @@ from tools.catalan_syllabification import CatalanSyllabificationTool
 from tools.catalan_translator import CatalanTranslatorTool
 
 # Configure logging
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, log_level, logging.INFO),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -315,7 +316,7 @@ async def start_services():
             app,
             host="0.0.0.0",
             port=8000,
-            log_level="info"
+            log_level=log_level.lower()
         )
         server = uvicorn.Server(config)
         
@@ -336,7 +337,7 @@ async def start_services():
             app,
             host="0.0.0.0",
             port=8000,
-            log_level="info"
+            log_level=log_level.lower()
         )
 
 
@@ -354,5 +355,5 @@ if __name__ == "__main__":
             app,
             host="0.0.0.0",
             port=8000,
-            log_level="info"
+            log_level=log_level.lower()
         )
