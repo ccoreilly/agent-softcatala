@@ -319,7 +319,7 @@ The following Python methods are available:
             ChatOpenRouter instance with google/gemma-3-27b-it:free as default model
         """
         # Use Gemma 3 as default - free and supports fallback function calling
-        return self.get_model("google/gemma-3-27b-it:free")
+        return self.get_model("openai/gpt-oss-20b:free")
     
     async def health_check(self) -> Dict[str, Any]:
         """Check OpenRouter API health.
