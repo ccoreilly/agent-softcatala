@@ -1,5 +1,6 @@
 """LangChain-compatible tools wrapper."""
 
+import json
 from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 
@@ -65,8 +66,20 @@ class LangChainToolWrapper(BaseTool):
         logger = logging.getLogger(__name__)
         
         logger.info(f"🔧 TOOL EXECUTION STARTED: {self.name}")
-        logger.info(f"🔧 Tool parameters: {kwargs}")
+        logger.info(f"🔧 Tool description: {self.description}")
+        logger.info(f"🔧 Tool parameters: {json.dumps(kwargs, indent=2, ensure_ascii=False)}")
         logger.info(f"🔧 Run manager: {run_manager}")
+        
+        # Log detailed parameter information
+        if hasattr(self.custom_tool, 'definition'):
+            definition = self.custom_tool.definition
+            logger.info(f"🔧 Tool definition name: {definition.name}")
+            logger.info(f"🔧 Tool definition description: {definition.description}")
+            if definition.parameters:
+                logger.info(f"🔧 Expected parameters: {[p.name for p in definition.parameters]}")
+                for param in definition.parameters:
+                    param_value = kwargs.get(param.name, 'NOT_PROVIDED')
+                    logger.info(f"🔧   - {param.name} ({param.type}): {param_value}")
         
         try:
             # Validate parameters
@@ -78,7 +91,15 @@ class LangChainToolWrapper(BaseTool):
             logger.info(f"🔧 Executing custom tool: {self.name}")
             result = await self.custom_tool.execute(**kwargs)
             logger.info(f"🔧 Tool execution completed: {self.name}")
-            logger.debug(f"🔧 Raw tool result: {result}")
+            
+            # Log the complete result structure
+            result_log = {
+                "tool_name": self.name,
+                "result_type": type(result).__name__,
+                "result_content": result,
+                "success": True
+            }
+            logger.info(f"🔧 COMPLETE TOOL RESULT: {json.dumps(result_log, indent=2, ensure_ascii=False)}")
             
             # Ensure the result indicates success/failure for agent processing
             if isinstance(result, dict):

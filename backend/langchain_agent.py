@@ -1,5 +1,6 @@
 """LangChain-based agent implementation."""
 
+import json
 import logging
 from typing import List, Dict, Any, AsyncGenerator, Optional
 from datetime import datetime
@@ -13,6 +14,7 @@ from langchain_core.runnables import RunnableConfig
 
 from models.model_manager import ModelManager
 from models.providers.hybrid_function_caller import HybridFunctionCaller
+from models.logging_wrapper import ComprehensiveLoggingHandler, LoggingModelWrapper, create_comprehensive_config
 from tools.langchain_tools import LangChainToolWrapper
 
 logger = logging.getLogger(__name__)
@@ -190,12 +192,16 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
         
         try:
             # Get the default model and provider
-            llm = self.model_manager.get_default_model()
+            base_llm = self.model_manager.get_default_model()
             provider = self.model_manager.get_provider_for_default_model()
             
-            logger.info(f"Using LLM: {llm}")
+            # Wrap the model with comprehensive logging
+            llm = LoggingModelWrapper(base_llm, session_id=f"agent_{int(datetime.now().timestamp())}")
+            
+            logger.info(f"Using LLM: {base_llm}")
             logger.info(f"Provider: {type(provider).__name__}")
-            logger.info(f"LLM has bind_tools capability: {hasattr(llm, 'bind_tools')}")
+            logger.info(f"LLM has bind_tools capability: {hasattr(base_llm, 'bind_tools')}")
+            logger.info("✅ LLM wrapped with comprehensive logging")
             
             # Create agent if we have tools
             if self.tools:
@@ -207,7 +213,8 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                 # Check if this is OpenRouter provider and use hybrid approach
                 if hasattr(provider, 'supports_native_function_calling'):
                     logger.info("Using OpenRouter provider with hybrid function calling")
-                    self.hybrid_caller = HybridFunctionCaller(provider, llm, self.tools)
+                    # Use the base model for hybrid caller (it has its own logging)
+                    self.hybrid_caller = HybridFunctionCaller(provider, base_llm, self.tools)
                     
                     # For OpenRouter, we'll handle function calling in chat_stream method
                     # For now, create a simple chain as fallback
@@ -215,7 +222,8 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                     logger.info("Created hybrid function calling setup for OpenRouter")
                 else:
                     # Use standard LangChain agent for other providers
-                    agent = create_openai_tools_agent(llm, self.tools, prompt)
+                    # Use base_llm for agent creation as LoggingModelWrapper might not be fully compatible
+                    agent = create_openai_tools_agent(base_llm, self.tools, prompt)
                     logger.info("OpenAI tools agent created successfully")
                     
                     self.agent_executor = AgentExecutor(
@@ -283,16 +291,26 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                 "chat_history": chat_history
             }
             
-            # Configure streaming callback
+            # Configure comprehensive logging with streaming callback
             streaming_callback = StreamingCallbackHandler(
                 lambda chunk: self._emit_chunk(chunk)
             )
             
+            comprehensive_logging = ComprehensiveLoggingHandler(session_id)
+            
             config = RunnableConfig(
-                callbacks=[streaming_callback],
-                tags=["streaming"],
+                callbacks=[streaming_callback, comprehensive_logging],
+                tags=["streaming", "comprehensive_logging"],
                 metadata={"session_id": session_id}
             )
+            
+            # Log the full message chain being sent to the agent
+            logger.info(f"🎯 AGENT INPUT PREPARATION (Session: {session_id}):")
+            logger.info(f"📋 Chat History ({len(chat_history)} messages):")
+            for i, msg in enumerate(chat_history):
+                logger.info(f"  [{i}] {msg.__class__.__name__}: {msg.content[:100]}...")
+            logger.info(f"💬 Current Input: {current_input}")
+            logger.info(f"📦 Complete Agent Input: {agent_input}")
             
             # Check if we should use hybrid function calling for OpenRouter
             if hasattr(self, 'hybrid_caller') and self.hybrid_caller:
@@ -312,6 +330,17 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                             langchain_messages.append(SystemMessage(content=content))
                     
                     response = await self.hybrid_caller.call_with_tools(langchain_messages)
+                    
+                    # Log the complete response from hybrid caller
+                    response_log = {
+                        "session_id": session_id,
+                        "timestamp": datetime.now().isoformat(),
+                        "response_type": type(response).__name__,
+                        "response_content": response.content if hasattr(response, 'content') else str(response),
+                        "tool_calls": getattr(response, 'tool_calls', None),
+                        "additional_kwargs": getattr(response, 'additional_kwargs', {})
+                    }
+                    logger.info(f"🎭 HYBRID CALLER COMPLETE RESPONSE: {json.dumps(response_log, indent=2, ensure_ascii=False)}")
                     
                     # Apply language checking for Catalan agent
                     # content = self._add_language_reminder(response.content)
@@ -357,11 +386,24 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                 # Fallback to regular invoke
                 try:
                     response = await self.agent_executor.ainvoke(agent_input, config=config)
+                    
+                    # Log the complete response from agent executor
+                    response_log = {
+                        "session_id": session_id,
+                        "timestamp": datetime.now().isoformat(),
+                        "agent_executor_type": type(self.agent_executor).__name__,
+                        "response_type": type(response).__name__,
+                        "response_content": response,
+                        "response_keys": list(response.keys()) if isinstance(response, dict) else "N/A"
+                    }
+                    logger.info(f"🎪 AGENT EXECUTOR COMPLETE RESPONSE: {json.dumps(response_log, indent=2, ensure_ascii=False)}")
+                    
                     # Apply language checking for Catalan agent
                     # content = self._add_language_reminder(response.get("output", str(response)))
+                    content = response.get("output", str(response)) if isinstance(response, dict) else str(response)
                     yield {
                         "type": "content",
-                        "content": response,
+                        "content": content,
                         "timestamp": datetime.now().isoformat()
                     }
                 except Exception as invoke_error:

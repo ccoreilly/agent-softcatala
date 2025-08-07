@@ -3,7 +3,9 @@
 import re
 import json
 import logging
+import time
 from typing import List, Dict, Any, Optional, Union
+from datetime import datetime
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
 from langchain_core.tools import BaseTool
 
@@ -137,15 +139,81 @@ The following Python methods are available:
         prompt += conversation
         return prompt
     
+    def _log_messages_chain(self, messages: List[BaseMessage], context: str = ""):
+        """Log the complete message chain."""
+        formatted_messages = []
+        for msg in messages:
+            formatted_messages.append({
+                "type": msg.__class__.__name__,
+                "content": msg.content,
+                "timestamp": datetime.now().isoformat(),
+                "additional_kwargs": getattr(msg, 'additional_kwargs', {}),
+                "tool_calls": getattr(msg, 'tool_calls', None)
+            })
+        
+        log_entry = {
+            "context": context,
+            "timestamp": datetime.now().isoformat(),
+            "message_count": len(messages),
+            "messages": formatted_messages,
+            "supports_native": self.supports_native,
+            "tools_available": [tool.name for tool in self.tools]
+        }
+        
+        logger.info(f"📋 HYBRID CALLER MESSAGE CHAIN ({context}): {json.dumps(log_entry, indent=2, ensure_ascii=False)}")
+    
     async def call_with_tools(self, messages: List[BaseMessage]) -> BaseMessage:
         """Call the model with tools, using native or fallback approach."""
-        if self.supports_native and self.tools:
-            return await self._call_with_native_tools(messages)
-        elif self.tools:
-            return await self._call_with_fallback_tools(messages)
-        else:
-            # No tools available, regular call
-            return await self.model.ainvoke(messages)
+        start_time = time.time()
+        call_id = f"hybrid_call_{int(time.time() * 1000)}"
+        
+        # Log the input message chain
+        self._log_messages_chain(messages, f"call_input_{call_id}")
+        
+        logger.info(f"🔀 HYBRID FUNCTION CALLER START (ID: {call_id}):")
+        logger.info(f"  📊 Native support: {self.supports_native}")
+        logger.info(f"  🔧 Tools available: {len(self.tools)}")
+        logger.info(f"  📝 Tool names: {[tool.name for tool in self.tools]}")
+        
+        try:
+            if self.supports_native and self.tools:
+                logger.info(f"  ✨ Using NATIVE function calling for {call_id}")
+                result = await self._call_with_native_tools(messages)
+            elif self.tools:
+                logger.info(f"  🔄 Using FALLBACK function calling for {call_id}")
+                result = await self._call_with_fallback_tools(messages)
+            else:
+                logger.info(f"  💬 Using REGULAR call (no tools) for {call_id}")
+                result = await self.model.ainvoke(messages)
+            
+            duration_ms = (time.time() - start_time) * 1000
+            
+            # Log the result
+            result_log = {
+                "call_id": call_id,
+                "timestamp": datetime.now().isoformat(),
+                "duration_ms": duration_ms,
+                "result_type": type(result).__name__,
+                "result_content": result.content if hasattr(result, 'content') else str(result),
+                "tool_calls": getattr(result, 'tool_calls', None)
+            }
+            
+            logger.info(f"✅ HYBRID FUNCTION CALLER SUCCESS ({call_id}): {json.dumps(result_log, indent=2, ensure_ascii=False)}")
+            return result
+            
+        except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            
+            error_log = {
+                "call_id": call_id,
+                "timestamp": datetime.now().isoformat(),
+                "duration_ms": duration_ms,
+                "error": str(e),
+                "error_type": type(e).__name__
+            }
+            
+            logger.error(f"❌ HYBRID FUNCTION CALLER ERROR ({call_id}): {json.dumps(error_log, indent=2, ensure_ascii=False)}")
+            raise
     
     async def _call_with_native_tools(self, messages: List[BaseMessage]) -> BaseMessage:
         """Handle native function calling."""

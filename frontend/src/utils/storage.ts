@@ -18,6 +18,7 @@ export const storage = {
   // Save all sessions
   saveSessions(sessions: ChatSession[]): void {
     try {
+      console.log('Saving sessions to storage:', sessions);
       localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
     } catch (error) {
       console.error('Error saving sessions:', error);

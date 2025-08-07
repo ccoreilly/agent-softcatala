@@ -13,20 +13,26 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
 
-  // Load sessions from storage
+  // Load sessions from storage on component mount only
   useEffect(() => {
     try {
+      console.log('Loading sessions from storage');
       const loadedSessions = storage.getSessions();
       setSessions(loadedSessions);
       
-      if (loadedSessions.length > 0 && !currentSessionId) {
+      // Try to restore the last current session ID, or use the first session
+      const savedCurrentSessionId = storage.getCurrentSessionId();
+      if (savedCurrentSessionId && loadedSessions.some(s => s.id === savedCurrentSessionId)) {
+        setCurrentSessionId(savedCurrentSessionId);
+      } else if (loadedSessions.length > 0) {
         setCurrentSessionId(loadedSessions[0].id);
       }
+      console.log('Loaded sessions:', loadedSessions);
     } catch (error) {
       console.error('Failed to load sessions:', error);
       setSessions([]);
     }
-  }, [currentSessionId]);
+  }, []); // Remove currentSessionId dependency to prevent race condition
 
   // Save sessions to storage whenever they change
   useEffect(() => {
@@ -39,15 +45,17 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
 
   const handleNewSession = () => {
     const newSession: ChatSession = {
-      id: crypto.randomUUID(),
+      id: new Date().getTime().toString(),
       name: 'Nova Conversa',
       messages: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
+    console.log('New session:', newSession);
     setSessions(prev => [newSession, ...prev]);
     setCurrentSessionId(newSession.id);
+    storage.setCurrentSessionId(newSession.id);
     
     // Note: assistant-ui runtime doesn't have switchToNewThread method
     // The Thread component will automatically handle new conversations
@@ -60,14 +68,17 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
       const remainingSessions = sessions.filter(s => s.id !== sessionId);
       if (remainingSessions.length > 0) {
         setCurrentSessionId(remainingSessions[0].id);
+        storage.setCurrentSessionId(remainingSessions[0].id);
       } else {
         setCurrentSessionId(null);
+        storage.setCurrentSessionId(null);
       }
     }
   };
 
   const handleSessionSelect = (sessionId: string) => {
     setCurrentSessionId(sessionId);
+    storage.setCurrentSessionId(sessionId);
     // Note: In a full implementation, you'd want to restore the conversation history
     // This would require additional assistant-ui API calls
   };
@@ -137,11 +148,6 @@ function ChatInterface({ runtime }: { runtime: ReturnType<typeof useLocalRuntime
               {/* Thread Component from assistant-ui */}
               <div className="flex-1 overflow-hidden h-full">
                 <Thread />
-              </div>
-
-              {/* Composer Component from assistant-ui */}
-              <div className="border-t border-gray-200 p-4 bg-white">
-                <Composer />
               </div>
             </>
           ) : (
