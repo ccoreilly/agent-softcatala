@@ -207,27 +207,27 @@ class CatalanTranslatorTool(BaseTool):
     async def _translate_apertium(self, text: str, langpair: str, format_type: str) -> Dict[str, Any]:
         """Translate using the Apertium API"""
         try:
-            body = {
+            data = {
                 'langpair': langpair,
                 'q': text,
                 'markUnknown': 'false',
                 'key': self.apertium_key
             }
             
-            self.logger.info(f"Apertium API request: {body}")
+            self.logger.info(f"Apertium API request: {data}")
 
             if format_type != 'txt':
-                body['format'] = format_type
+                data['format'] = format_type
                 
-            response = await self.client.post(self.apertium_url, json=body)
+            response = await self.client.post(self.apertium_url, data=data)
             response.raise_for_status()
             
-            data = response.json()
+            response_data = response.json()
 
-            self.logger.info(f"Apertium API response: {data}")
+            self.logger.info(f"Apertium API response: {response_data}")
 
-            if 'responseData' in data and 'translatedText' in data['responseData']:
-                translated_text = data['responseData']['translatedText']
+            if 'responseData' in response_data and 'translatedText' in response_data['responseData']:
+                translated_text = response_data['responseData']['translatedText']
                 
                 return {
                     'success': True,
@@ -243,7 +243,7 @@ class CatalanTranslatorTool(BaseTool):
                     'success': False,
                     'error': 'Format de resposta API inesperat',
                     'error_en': 'Unexpected API response format',
-                    'response': data
+                    'response': response_data
                 }
                 
         except httpx.HTTPStatusError as e:
@@ -263,23 +263,23 @@ class CatalanTranslatorTool(BaseTool):
     async def _translate_neuronal(self, text: str, langpair: str, format_type: str) -> Dict[str, Any]:
         """Translate using the Neuronal API"""
         try:
-            body = {
+            data = {
                 'langpair': langpair,
                 'q': text,
                 'savetext': 'false'
             }
             
-            self.logger.info(f"Neuronal API request: {body}")
+            self.logger.info(f"Neuronal API request: {data}")
 
-            response = await self.client.post(self.neuronal_url, json=body)
+            response = await self.client.post(self.neuronal_url, data=data)
             response.raise_for_status()
             
-            data = response.json()
+            response_data = response.json()
 
-            self.logger.debug(f"Neuronal API response: {data}")
+            self.logger.debug(f"Neuronal API response: {response_data}")
             
-            if 'responseData' in data and 'translatedText' in data['responseData']:
-                translated_text = data['responseData']['translatedText']
+            if 'responseData' in response_data and 'translatedText' in response_data['responseData']:
+                translated_text = response_data['responseData']['translatedText']
                 
                 return {
                     'success': True,
@@ -295,7 +295,7 @@ class CatalanTranslatorTool(BaseTool):
                     'success': False,
                     'error': 'Format de resposta API inesperat',
                     'error_en': 'Unexpected API response format',
-                    'response': data
+                    'response': response_data
                 }
                 
         except httpx.HTTPStatusError as e:
