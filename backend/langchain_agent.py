@@ -649,3 +649,9 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
         except Exception as e:
             logger.error(f"Failed to switch model: {e}")
             raise
+
+    def get_current_model(self) -> str:
+        """Get the current model."""
+        model_config = self.agent_executor.model_config
+        logger.info(f"Model config: {model_config}")
+        return json.dumps(self.agent_executor.model_config)

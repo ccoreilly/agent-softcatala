@@ -56,8 +56,7 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("start", self.start_command))
         self.application.add_handler(CommandHandler("help", self.help_command))
         self.application.add_handler(CommandHandler("clear", self.clear_command))
-        self.application.add_handler(CommandHandler("history", self.history_command))
-        self.application.add_handler(CommandHandler("status", self.status_command))
+        self.application.add_handler(CommandHandler("info", self.info_command))
         self.application.add_handler(CommandHandler("debug", self.debug_command))
         self.application.add_handler(CommandHandler("models", self.models_command))
         self.application.add_handler(CommandHandler("model", self.model_command))
@@ -83,8 +82,7 @@ class TelegramBot:
             "Ordres:\n"
             "/help - Mostra aquest missatge d'ajuda\n"
             "/clear - Esborra l'historial de conversa\n"
-            "/history - Mostra estadístiques de conversa\n"
-            "/status - Comprova l'estat del bot i l'IA\n"
+            "/info - Mostra estadístiques de conversa\n"
             "/debug - Activa/desactiva el mode debug\n"
             "/models - Mostra models disponibles\n"
             "/model [proveïdor] [model] - Canvia el model d'IA\n\n"
@@ -132,64 +130,26 @@ class TelegramBot:
         )
         logger.info(f"Cleared history for chat {chat_id}")
     
-    async def history_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle /history command to show conversation statistics."""
+    async def info_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handle /info command to show conversation statistics."""
         chat_id = str(update.effective_chat.id)
         
         user_messages = self.message_history.get_user_message_count(chat_id)
         total_messages = self.message_history.get_total_message_count(chat_id)
+
+        current_model = self.agent.get_current_model()
         
         history_message = (
             f"📊 *Estadístiques de Conversa*\n\n"
             f"👤 Els teus missatges: {user_messages}\n"
             f"🤖 Missatges totals: {total_messages}\n"
             f"📝 Màxim de missatges d'usuari emmagatzemats: {self.message_history.max_user_messages}\n\n"
+            f"🤖 Model actual: {current_model}\n\n"
             f"Utilitza /clear per restablir l'historial de conversa."
         )
         
         await update.message.reply_text(history_message, parse_mode=ParseMode.MARKDOWN)
-    
-    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Handle /status command to show bot and AI status."""
-        try:
-            # Check agent health
-            health_status = await self.agent.check_health()
-            
-            models_info = health_status.get("models", {})
-            tools_info = health_status.get("tools", {})
-            
-            status_message = "🔍 *Estat del Bot*\n\n"
-            
-            # Model status
-            status_message += "🧠 *Models d'IA:*\n"
-            for provider, info in models_info.items():
-                if isinstance(info, dict):
-                    status = info.get("status", "unknown")
-                    if status == "available":
-                        status_ca = "disponible"
-                    elif status == "unavailable":
-                        status_ca = "no disponible"
-                    else:
-                        status_ca = "desconegut"
-                    emoji = "✅" if status == "available" else "❌"
-                    status_message += f"{emoji} {provider}: {status_ca}\n"
-            
-            # Tools status
-            status_message += f"\n🛠️ *Eines Disponibles:* {tools_info.get('count', 0)}\n"
-            for tool_name in tools_info.get('names', []):
-                status_message += f"• {tool_name}\n"
-            
-            # Bot info
-            status_message += f"\n🤖 *Informació del Bot:*\n"
-            status_message += f"• Xats actius: {len(self.message_history.get_chat_ids())}\n"
-            status_message += f"• Bot funcionant: ✅\n"
-            
-        except Exception as e:
-            status_message = f"❌ *Error comprovant l'estat:*\n{str(e)}"
-            logger.error(f"Error in status command: {e}")
-        
-        await update.message.reply_text(status_message, parse_mode=ParseMode.MARKDOWN)
-    
+
     async def debug_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /debug command to toggle debug mode."""
         chat_id = str(update.effective_chat.id)
@@ -830,16 +790,40 @@ class TelegramBot:
             
             logger.info("Telegram bot is running!")
             
-            # Keep the bot running
-            while True:
-                await asyncio.sleep(1)
+            # Keep the bot running until cancelled
+            try:
+                while True:
+                    await asyncio.sleep(1)
+            except asyncio.CancelledError:
+                logger.info("Telegram bot cancelled, shutting down...")
+                raise
                 
+        except asyncio.CancelledError:
+            logger.info("Telegram bot task was cancelled")
+            raise
         except Exception as e:
             logger.error(f"Error starting Telegram bot: {e}")
             raise
         finally:
             if self.application:
-                await self.application.stop()
+                try:
+                    logger.info("Stopping Telegram bot application...")
+                    
+                    # Stop polling first to prevent network errors
+                    if self.application.updater and self.application.updater.running:
+                        logger.info("Stopping updater...")
+                        await self.application.updater.stop()
+                    
+                    # Then stop the application
+                    if self.application.running:
+                        await self.application.stop()
+                    
+                    # Finally shutdown
+                    await self.application.shutdown()
+                    logger.info("Telegram bot stopped successfully")
+                except Exception as e:
+                    logger.error(f"Error stopping Telegram bot: {e}")
+                    # Don't re-raise to avoid masking the original cancellation
     
     async def stop_bot(self) -> None:
         """Stop the Telegram bot."""

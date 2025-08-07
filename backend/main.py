@@ -7,6 +7,7 @@ import json
 import os
 import logging
 import asyncio
+import signal
 from dotenv import load_dotenv
 
 from langchain_agent import LangChainAgent
@@ -294,14 +295,19 @@ async def start_telegram_bot():
         telegram_bot = TelegramBot(telegram_token, agent, max_user_messages)
         await telegram_bot.start_bot()
         
+    except asyncio.CancelledError:
+        logger.info("Telegram bot startup was cancelled")
+        raise
     except ImportError:
         logger.error("python-telegram-bot not installed. Install with: pip install python-telegram-bot==21.0.1")
+        raise
     except Exception as e:
         logger.error(f"Error starting Telegram bot: {e}")
+        raise
 
 
 async def start_services():
-    """Start both HTTP server and Telegram bot."""
+    """Start both HTTP server and Telegram bot with proper shutdown handling."""
     # Check if we should run Telegram bot
     telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
     
@@ -321,25 +327,123 @@ async def start_services():
         )
         server = uvicorn.Server(config)
         
-        # Start HTTP server in background
-        http_task = asyncio.create_task(server.serve())
+        # Create a custom server task that we can monitor
+        async def run_server():
+            try:
+                await server.serve()
+            except Exception as e:
+                logger.error(f"Server error: {e}")
+                raise
         
-        # Wait for both services
+        http_task = asyncio.create_task(run_server())
+        
+        # Wait for both services or until one completes/fails
         try:
-            await asyncio.gather(telegram_task, http_task)
+            done, pending = await asyncio.wait(
+                [telegram_task, http_task],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            
+            # If we get here, either the server stopped (Ctrl+C) or Telegram bot failed
+            logger.info("One service completed, shutting down remaining services...")
+            
         except KeyboardInterrupt:
-            logger.info("Shutting down services...")
+            logger.info("KeyboardInterrupt received, shutting down services...")
         except Exception as e:
             logger.error(f"Error running services: {e}")
+        finally:
+            # Cleanup: cancel all remaining tasks
+            all_tasks = [telegram_task, http_task]
+            
+            # Cancel any running tasks
+            for task in all_tasks:
+                if not task.done():
+                    logger.info(f"Cancelling task: {task.get_name() if hasattr(task, 'get_name') else 'unknown'}")
+                    task.cancel()
+            
+            # Wait for tasks to finish cancelling
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*all_tasks, return_exceptions=True),
+                    timeout=5.0
+                )
+                logger.info("All tasks completed cleanup")
+            except asyncio.TimeoutError:
+                logger.warning("Some tasks did not complete cleanup within timeout")
+            except Exception as e:
+                logger.debug(f"Cleanup exception (likely harmless): {e}")
+            
+            # Clean up httpx clients from tools to prevent hanging connections
+            try:
+                logger.info("Cleaning up HTTP clients...")
+                # Close httpx clients in Catalan tools
+                tool_clients = [
+                    catalan_synonyms_tool.client,
+                    catalan_spell_checker_tool.client,
+                    catalan_verbs_tool.client,
+                    catalan_translator_tool.client
+                ]
+                
+                for client in tool_clients:
+                    if hasattr(client, 'aclose'):
+                        await client.aclose()
+                
+                logger.info("HTTP clients cleaned up successfully")
+            except Exception as e:
+                logger.warning(f"Error cleaning up HTTP clients: {e}")
+            
+            # Log any remaining tasks for debugging, but don't try to cancel them
+            # to avoid recursion errors with internal asyncio tasks
+            current_task = asyncio.current_task()
+            remaining_tasks = [
+                task for task in asyncio.all_tasks() 
+                if not task.done() and task is not current_task
+            ]
+            
+            if remaining_tasks:
+                logger.debug(f"Found {len(remaining_tasks)} remaining tasks (likely internal asyncio tasks)")
+                # Let asyncio handle cleanup of internal tasks naturally
+            
+            logger.info("All services stopped")
+            exit(0)
     else:
         logger.info("Starting HTTP endpoint only (no Telegram token provided)...")
+        
+        # For HTTP-only mode, use uvicorn's built-in signal handling
         import uvicorn
-        uvicorn.run(
+        config = uvicorn.Config(
             app,
             host="0.0.0.0",
             port=8000,
             log_level=log_level.lower()
         )
+        server = uvicorn.Server(config)
+        
+        try:
+            await server.serve()
+        except KeyboardInterrupt:
+            logger.info("HTTP server shutdown complete")
+        except Exception as e:
+            logger.error(f"Error running HTTP server: {e}")
+        finally:
+            # Clean up httpx clients from tools to prevent hanging connections
+            try:
+                logger.info("Cleaning up HTTP clients...")
+                tool_clients = [
+                    catalan_synonyms_tool.client,
+                    catalan_spell_checker_tool.client,
+                    catalan_verbs_tool.client,
+                    catalan_syllabification_tool.client,
+                    catalan_translator_tool.client
+                ]
+                
+                for client in tool_clients:
+                    if hasattr(client, 'aclose'):
+                        await client.aclose()
+                
+                logger.info("HTTP clients cleaned up successfully")
+            except Exception as e:
+                logger.warning(f"Error cleaning up HTTP clients: {e}")
 
 
 if __name__ == "__main__":
@@ -348,13 +452,25 @@ if __name__ == "__main__":
     
     if telegram_token:
         # Run with asyncio to support Telegram bot
-        asyncio.run(start_services())
+        try:
+            asyncio.run(start_services())
+            logger.info("Application shutdown completed")
+        except KeyboardInterrupt:
+            logger.info("Application interrupted and shutdown completed")
+        except SystemExit:
+            logger.info("Application exited normally")
+        except Exception as e:
+            logger.error(f"Application error: {e}")
+            raise
     else:
         # Run only HTTP server
         import uvicorn
-        uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=8000,
-            log_level=log_level.lower()
-        )
+        try:
+            uvicorn.run(
+                app,
+                host="0.0.0.0",
+                port=8000,
+                log_level=log_level.lower()
+            )
+        except KeyboardInterrupt:
+            logger.info("HTTP server shutdown completed")
