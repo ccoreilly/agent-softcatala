@@ -314,10 +314,10 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                     response = await self.hybrid_caller.call_with_tools(langchain_messages)
                     
                     # Apply language checking for Catalan agent
-                    content = self._add_language_reminder(response.content)
+                    # content = self._add_language_reminder(response.content)
                     yield {
                         "type": "content",
-                        "content": content,
+                        "content": response.content,
                         "timestamp": datetime.now().isoformat()
                     }
                     return
@@ -358,10 +358,10 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                 try:
                     response = await self.agent_executor.ainvoke(agent_input, config=config)
                     # Apply language checking for Catalan agent
-                    content = self._add_language_reminder(response.get("output", str(response)))
+                    # content = self._add_language_reminder(response.get("output", str(response)))
                     yield {
                         "type": "content",
-                        "content": content,
+                        "content": response,
                         "timestamp": datetime.now().isoformat()
                     }
                 except Exception as invoke_error:
@@ -395,10 +395,10 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
         if "output" in chunk:
             logger.info(f"Found output chunk: {chunk['output']}")
             # Apply language checking for Catalan agent
-            content = self._add_language_reminder(chunk["output"])
+            # content = self._add_language_reminder(chunk["output"])
             return {
                 "type": "content",
-                "content": content,
+                "content": chunk["output"],
                 "timestamp": datetime.now().isoformat()
             }
         elif "intermediate_steps" in chunk:

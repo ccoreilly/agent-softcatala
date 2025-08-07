@@ -519,6 +519,37 @@ class TelegramBot:
                 self.last_message_content.pop(key, None)
             logger.info(f"Cleaned up {len(keys_to_remove)} old message tracking entries")
     
+    def _filter_tool_information(self, content: str, debug_enabled: bool) -> str:
+        """
+        Filter out tool call and output information from content when debug is disabled.
+        
+        Args:
+            content: The content to filter
+            debug_enabled: Whether debug mode is enabled
+            
+        Returns:
+            Filtered content with tool information removed if debug is disabled
+        """
+        if debug_enabled:
+            return content
+        
+        import re
+        
+        # Remove tool_code blocks
+        content = re.sub(r'tool_code\s*\n.*?\n\n', '', content, flags=re.DOTALL)
+        
+        # Remove tool_output blocks
+        content = re.sub(r'tool_output\s*\n.*?\n\n', '', content, flags=re.DOTALL)
+        
+        # Remove standalone "tool_code" and "tool_output" lines
+        content = re.sub(r'\n\s*tool_code\s*\n', '\n', content)
+        content = re.sub(r'\n\s*tool_output\s*\n', '\n', content)
+        
+        # Clean up extra newlines that might be left
+        content = re.sub(r'\n\s*\n\s*\n', '\n\n', content)
+        
+        return content.strip()
+    
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle regular text messages."""
         chat_id = str(update.effective_chat.id)
@@ -564,36 +595,17 @@ class TelegramBot:
                         if content:
                             full_response += content
                             response_parts.append(content)
-                            
-                            # Update message every few chunks or when we have substantial content
-                            if len(response_parts) % 3 == 0 or len(full_response) > 100:
-                                message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
-                                # Try with markdown first
-                                success = await self.safe_edit_message(
-                                    thinking_msg,
-                                    f"🤖 {full_response}",
-                                    parse_mode=ParseMode.MARKDOWN,
-                                    message_key=message_key
-                                )
-                                # If markdown fails, try without it
-                                if not success:
-                                    await self.safe_edit_message(
-                                        thinking_msg,
-                                        f"🤖 {full_response}",
-                                        message_key=message_key
-                                    )
                     
                     elif chunk_type == "tool_call":
-                        tool_name = chunk.get("tool", "unknown")
-                        tool_input = chunk.get("input", {})
-                        timestamp = chunk.get("timestamp", "")
-                        message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
-                        
                         # Check if debug mode is enabled for this chat
                         debug_enabled = self.debug_mode.get(chat_id, False)
                         
                         # Only show tool call messages when debug mode is enabled
                         if debug_enabled:
+                            tool_name = chunk.get("tool", "unknown")
+                            tool_input = chunk.get("input", {})
+                            timestamp = chunk.get("timestamp", "")
+                            
                             # Create detailed tool call message
                             tool_msg = f"🔧 **Eina seleccionada:** `{tool_name}`\n"
                             tool_msg += f"⏰ **Hora:** {timestamp}\n"
@@ -612,25 +624,24 @@ class TelegramBot:
                             
                             tool_msg += "⏳ **Estat:** Executant eina..."
                             
-                            await self.safe_edit_message(
-                                thinking_msg,
-                                tool_msg,
-                                parse_mode=ParseMode.MARKDOWN,
-                                message_key=message_key
+                            # Send as new message instead of editing
+                            await self._send_split_message(
+                                chat_id=int(chat_id),
+                                content=tool_msg,
+                                parse_mode=ParseMode.MARKDOWN
                             )
                     
                     elif chunk_type == "tool_result":
-                        tool_name = chunk.get("tool", "unknown")
-                        result = chunk.get("result", {})
-                        tool_input = chunk.get("input", {})
-                        timestamp = chunk.get("timestamp", "")
-                        message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
-                        
                         # Check if debug mode is enabled for this chat
                         debug_enabled = self.debug_mode.get(chat_id, False)
                         
                         # Only show tool result messages when debug mode is enabled
                         if debug_enabled:
+                            tool_name = chunk.get("tool", "unknown")
+                            result = chunk.get("result", {})
+                            tool_input = chunk.get("input", {})
+                            timestamp = chunk.get("timestamp", "")
+                            
                             # Create detailed tool result message
                             result_msg = f"✅ **Eina completada:** `{tool_name}`\n"
                             result_msg += f"⏰ **Hora:** {timestamp}\n"
@@ -691,35 +702,34 @@ class TelegramBot:
                             
                             result_msg += "🤔 **Estat:** Processant resultats..."
                             
-                            await self.safe_edit_message(
-                                thinking_msg,
-                                result_msg,
-                                parse_mode=ParseMode.MARKDOWN,
-                                message_key=message_key
+                            # Send as new message instead of editing
+                            await self._send_split_message(
+                                chat_id=int(chat_id),
+                                content=result_msg,
+                                parse_mode=ParseMode.MARKDOWN
                             )
                     
                     elif chunk_type == "tool_error":
-                        tool_name = chunk.get("tool", "unknown")
-                        error_msg = chunk.get("error", "Error desconegut")
-                        timestamp = chunk.get("timestamp", "")
-                        message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
-                        
                         # Check if debug mode is enabled for this chat
                         debug_enabled = self.debug_mode.get(chat_id, False)
                         
                         # Only show tool error messages when debug mode is enabled
                         if debug_enabled:
+                            tool_name = chunk.get("tool", "unknown")
+                            error_msg = chunk.get("error", "Error desconegut")
+                            timestamp = chunk.get("timestamp", "")
+                            
                             # Create detailed tool error message
                             tool_error_msg = f"❌ **Error d'eina:** `{tool_name}`\n"
                             tool_error_msg += f"⏰ **Hora:** {timestamp}\n"
                             tool_error_msg += f"⚠️ **Error:** `{error_msg[:200]}{'...' if len(error_msg) > 200 else ''}`\n"
                             tool_error_msg += "🔄 Continuant sense aquesta eina..."
                             
-                            await self.safe_edit_message(
-                                thinking_msg,
-                                tool_error_msg,
-                                parse_mode=ParseMode.MARKDOWN,
-                                message_key=message_key
+                            # Send as new message instead of editing
+                            await self._send_split_message(
+                                chat_id=int(chat_id),
+                                content=tool_error_msg,
+                                parse_mode=ParseMode.MARKDOWN
                             )
                     
                     elif chunk_type == "error":
@@ -740,31 +750,41 @@ class TelegramBot:
                         )
                         return
                 
-                # Final response
+                # Final response - send as new message instead of editing
                 if full_response:
-                    message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
-                    # Try with markdown first
-                    success = await self.safe_edit_message(
-                        thinking_msg,
-                        f"🤖 {full_response}",
-                        parse_mode=ParseMode.MARKDOWN,
-                        message_key=message_key
-                    )
-                    # If markdown fails, try without it
-                    if not success:
-                        await self.safe_edit_message(
-                            thinking_msg,
-                            f"🤖 {full_response}",
-                            message_key=message_key
-                        )
+                    # Filter tool information if debug is disabled
+                    debug_enabled = self.debug_mode.get(chat_id, False)
+                    filtered_response = self._filter_tool_information(full_response, debug_enabled)
                     
-                    # Add assistant response to history
-                    self.message_history.add_message(chat_id, "assistant", full_response)
-                else:
+                    # Send the response as a new message
+                    await self._send_split_message(
+                        chat_id=int(chat_id),
+                        content=f"🤖 {filtered_response}",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                    
+                    # Delete or update the thinking message to show completion
                     message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
                     await self.safe_edit_message(
                         thinking_msg,
-                        "🤖 Ho sento, no he pogut generar una resposta.",
+                        "✅ Resposta completada",
+                        message_key=message_key
+                    )
+                    
+                    # Add assistant response to history (use filtered response)
+                    self.message_history.add_message(chat_id, "assistant", filtered_response)
+                else:
+                    # Send error as new message
+                    await self._send_split_message(
+                        chat_id=int(chat_id),
+                        content="🤖 Ho sento, no he pogut generar una resposta."
+                    )
+                    
+                    # Update thinking message to show error
+                    message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
+                    await self.safe_edit_message(
+                        thinking_msg,
+                        "❌ Error en la generació de resposta",
                         message_key=message_key
                     )
                 
