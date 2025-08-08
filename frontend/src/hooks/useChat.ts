@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import { ChatMessage, StreamChunk } from '../types';
 
 const API_BASE = process.env.NODE_ENV === 'production' 
-  ? (process.env.REACT_APP_BACKEND_URL || 'https://agent-softcatala.onrender.com:8000')
+  ? (process.env.REACT_APP_BACKEND_URL || 'https://agent-softcatala.onrender.com')
   : 'http://localhost:8000';
 
 export const useChat = () => {
