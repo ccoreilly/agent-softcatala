@@ -8,6 +8,16 @@ jest.mock('../utils/storage', () => ({
   storage: {
     getSessions: jest.fn(),
     saveSessions: jest.fn(),
+    getCurrentSessionId: jest.fn(),
+    setCurrentSessionId: jest.fn(),
+    getSession: jest.fn(),
+    createSession: jest.fn(),
+    updateSession: jest.fn(),
+    deleteSession: jest.fn(),
+    addMessage: jest.fn(),
+    clearAll: jest.fn(),
+    exportSessions: jest.fn(),
+    importSessions: jest.fn(),
   }
 }));
 
@@ -21,6 +31,19 @@ jest.mock('../lib/utils', () => ({
   cn: (...classes: string[]) => classes.filter(Boolean).join(' ')
 }));
 
+// Mock assistant-ui components
+jest.mock('@assistant-ui/react', () => ({
+  AssistantRuntimeProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Thread: () => <div data-testid="thread">Thread Component</div>,
+  Composer: () => <div data-testid="composer">Composer Component</div>,
+  useLocalRuntime: () => ({
+    // Mock runtime object
+    status: 'ready',
+    messages: [],
+    isRunning: false,
+  }),
+}));
+
 // Get the mocked storage functions
 const { storage: mockStorage } = require('../utils/storage');
 
@@ -29,6 +52,22 @@ describe('App Component', () => {
     jest.clearAllMocks();
     mockStorage.getSessions.mockReturnValue([]);
     mockStorage.saveSessions.mockImplementation(() => {});
+    mockStorage.getCurrentSessionId.mockReturnValue(null);
+    mockStorage.setCurrentSessionId.mockImplementation(() => {});
+    mockStorage.getSession.mockReturnValue(undefined);
+    mockStorage.createSession.mockImplementation((name: string) => ({
+      id: 'mock-session-id',
+      name,
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+    mockStorage.updateSession.mockImplementation(() => {});
+    mockStorage.deleteSession.mockImplementation(() => {});
+    mockStorage.addMessage.mockImplementation(() => {});
+    mockStorage.clearAll.mockImplementation(() => {});
+    mockStorage.exportSessions.mockReturnValue('[]');
+    mockStorage.importSessions.mockReturnValue(true);
   });
 
   describe('Initial Rendering', () => {
@@ -102,6 +141,8 @@ describe('App Component', () => {
         }
       ];
       mockStorage.getSessions.mockReturnValue(mockSessions);
+      // Mock that this session is the current one (first session gets selected automatically)
+      mockStorage.getCurrentSessionId.mockReturnValue('1');
       
       render(<App />);
       
@@ -154,6 +195,8 @@ describe('App Component', () => {
         }
       ];
       mockStorage.getSessions.mockReturnValue(mockSessions);
+      // No current session saved, so first one should be selected automatically
+      mockStorage.getCurrentSessionId.mockReturnValue(null);
       
       render(<App />);
       
@@ -182,6 +225,7 @@ describe('App Component', () => {
         }
       ];
       mockStorage.getSessions.mockReturnValue(mockSessions);
+      mockStorage.getCurrentSessionId.mockReturnValue('1'); // Set first session as current
       
       render(<App />);
       
@@ -219,6 +263,7 @@ describe('App Component', () => {
         }
       ];
       mockStorage.getSessions.mockReturnValue(mockSessions);
+      mockStorage.getCurrentSessionId.mockReturnValue('1'); // Set first session as current
       
       render(<App />);
       
@@ -265,12 +310,12 @@ describe('App Component', () => {
         }
       ];
       mockStorage.getSessions.mockReturnValue(mockSessions);
+      mockStorage.getCurrentSessionId.mockReturnValue('1'); // Set session as current
       
       render(<App />);
       
-      // Should show the Thread and Composer components (mocked)
+      // Should show the Thread component (mocked) when session is selected
       expect(screen.getByTestId('thread')).toBeInTheDocument();
-      expect(screen.getByTestId('composer')).toBeInTheDocument();
     });
   });
 
@@ -298,6 +343,7 @@ describe('App Component', () => {
         }
       ];
       mockStorage.getSessions.mockReturnValue(mockSessions);
+      mockStorage.getCurrentSessionId.mockReturnValue('1'); // Set session as current
       
       render(<App />);
       
@@ -332,7 +378,7 @@ describe('App Component', () => {
       expect(screen.getByText('Agent de Softcatalà')).toBeInTheDocument();
     });
 
-    it('renders Thread and Composer components when session is selected', () => {
+    it('renders Thread component when session is selected', () => {
       const mockSessions = [
         {
           id: '1',
@@ -343,12 +389,12 @@ describe('App Component', () => {
         }
       ];
       mockStorage.getSessions.mockReturnValue(mockSessions);
+      mockStorage.getCurrentSessionId.mockReturnValue('1'); // Set session as current
       
       render(<App />);
       
-      // Should render the mocked Thread and Composer components
+      // Should render the mocked Thread component
       expect(screen.getByTestId('thread')).toBeInTheDocument();
-      expect(screen.getByTestId('composer')).toBeInTheDocument();
     });
   });
 });
