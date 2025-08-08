@@ -51,6 +51,8 @@ class LangChainAgent:
         use_catalan_tools = (agent_type == "softcatala_catalan")
         self.tools = self._wrap_tools(tools or [], use_catalan=use_catalan_tools)
         self.agent_executor = None
+        self.hybrid_caller = None
+        self.current_model = None  # Track the current model
         self._setup_agent()
     
     def _wrap_tools(self, tools: List, use_catalan: bool = False) -> List[BaseTool]:
@@ -195,6 +197,9 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             base_llm = self.model_manager.get_default_model()
             provider = self.model_manager.get_provider_for_default_model()
             
+            # Store reference to current model
+            self.current_model = base_llm
+            
             # Wrap the model with comprehensive logging
             llm = LoggingModelWrapper(base_llm, session_id=f"agent_{int(datetime.now().timestamp())}")
             
@@ -210,18 +215,39 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                     logger.info(f"  - {tool.name}: {tool.description}")
                     logger.debug(f"    Schema: {tool.args_schema}")
                 
-                # Check if this is OpenRouter provider and use hybrid approach
+                # Check if this is OpenRouter provider
                 if hasattr(provider, 'supports_native_function_calling'):
-                    logger.info("Using OpenRouter provider with hybrid function calling")
-                    # Use the base model for hybrid caller (it has its own logging)
-                    self.hybrid_caller = HybridFunctionCaller(provider, base_llm, self.tools)
+                    # Get current model name to check for native support
+                    model_name = getattr(base_llm, 'model_name', getattr(base_llm, 'model', 'unknown'))
+                    supports_native = provider.supports_native_function_calling(model_name)
                     
-                    # For OpenRouter, we'll handle function calling in chat_stream method
-                    # For now, create a simple chain as fallback
-                    self.agent_executor = prompt | llm
-                    logger.info("Created hybrid function calling setup for OpenRouter")
+                    if supports_native:
+                        logger.info(f"Using standard LangChain agent for OpenRouter model {model_name} (native function calling)")
+                        # Use standard LangChain agent for models with native support
+                        agent = create_openai_tools_agent(base_llm, self.tools, prompt)
+                        logger.info("OpenAI tools agent created successfully")
+                        
+                        self.agent_executor = AgentExecutor(
+                            agent=agent,
+                            tools=self.tools,
+                            verbose=True,
+                            handle_parsing_errors=True,
+                            max_iterations=3
+                        )
+                        logger.info("AgentExecutor created successfully")
+                        self.hybrid_caller = None
+                    else:
+                        logger.info(f"Using fallback function calling for OpenRouter model {model_name} (no native support)")
+                        # Use fallback approach for models without native support
+                        use_catalan = (self.agent_type == "softcatala_catalan")
+                        self.hybrid_caller = HybridFunctionCaller(provider, base_llm, self.tools, use_catalan=use_catalan)
+                        
+                        # Create a simple chain as the agent executor for fallback mode
+                        self.agent_executor = prompt | llm
+                        logger.info("Created fallback function calling setup for OpenRouter")
                 else:
                     # Use standard LangChain agent for other providers
+                    logger.info("Using standard LangChain agent for non-OpenRouter provider")
                     # Use base_llm for agent creation as LoggingModelWrapper might not be fully compatible
                     agent = create_openai_tools_agent(base_llm, self.tools, prompt)
                     logger.info("OpenAI tools agent created successfully")
@@ -312,10 +338,10 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             logger.info(f"💬 Current Input: {current_input}")
             logger.info(f"📦 Complete Agent Input: {agent_input}")
             
-            # Check if we should use hybrid function calling for OpenRouter
+            # Check if we should use fallback function calling (only for non-native models)
             if hasattr(self, 'hybrid_caller') and self.hybrid_caller:
                 try:
-                    logger.info("Using hybrid function caller for OpenRouter")
+                    logger.info("Using fallback function calling for OpenRouter model without native support")
                     # Convert messages to LangChain format for hybrid caller
                     langchain_messages = []
                     for msg in [{"role": "system", "content": "You are a helpful assistant."}] + messages:
@@ -340,7 +366,7 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                         "tool_calls": getattr(response, 'tool_calls', None),
                         "additional_kwargs": getattr(response, 'additional_kwargs', {})
                     }
-                    logger.info(f"🎭 HYBRID CALLER COMPLETE RESPONSE: {json.dumps(response_log, indent=2, ensure_ascii=False)}")
+                    logger.info(f"🎭 FALLBACK CALLER COMPLETE RESPONSE: {json.dumps(response_log, indent=2, ensure_ascii=False)}")
                     
                     # Apply language checking for Catalan agent
                     # content = self._add_language_reminder(response.content)
@@ -352,7 +378,7 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                     return
                     
                 except Exception as e:
-                    logger.error(f"Hybrid function calling failed: {e}, falling back to regular agent")
+                    logger.error(f"Fallback function calling failed: {e}, falling back to regular agent")
             
             if hasattr(self.agent_executor, 'astream'):
                 # Stream with agent executor
@@ -557,7 +583,16 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                                 "input": tool_call.get("args", {}),
                                 "timestamp": datetime.now().isoformat()
                             }
-                    
+                    # Check for functions in message
+                    if hasattr(last_msg, 'type') and last_msg.type == "function":
+                        logger.info(f"🔧 Function in message: {last_msg.content}")
+                        return {
+                            "type": "function",
+                            "tool": last_msg.name,
+                            "output": last_msg.content,
+                            "timestamp": datetime.now().isoformat()
+                        }
+                                        
                     # Regular message content
                     if hasattr(last_msg, 'content') and last_msg.content:
                         content = last_msg.content
@@ -622,8 +657,12 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             **kwargs: Additional model parameters
         """
         try:
-            # Get the new model
+            # Get the new model and provider
             new_model = self.model_manager.get_model(provider, model_name, **kwargs)
+            new_provider = self.model_manager.get_provider(provider)
+            
+            # Store reference to current model
+            self.current_model = new_model
             
             # Recreate the agent with the new model using the same prompt selection logic
             if self.agent_type == "softcatala_catalan":
@@ -633,16 +672,44 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                 prompt = self._get_softcatala_english_prompt()
             
             if self.tools:
-                agent = create_openai_tools_agent(new_model, self.tools, prompt)
-                self.agent_executor = AgentExecutor(
-                    agent=agent,
-                    tools=self.tools,
-                    verbose=True,
-                    handle_parsing_errors=True,
-                    max_iterations=3
-                )
+                # Check if this is OpenRouter provider
+                if hasattr(new_provider, 'supports_native_function_calling'):
+                    supports_native = new_provider.supports_native_function_calling(model_name)
+                    
+                    if supports_native:
+                        logger.info(f"Using standard LangChain agent for OpenRouter model {model_name} (native function calling)")
+                        # Use standard LangChain agent for models with native support
+                        agent = create_openai_tools_agent(new_model, self.tools, prompt)
+                        self.agent_executor = AgentExecutor(
+                            agent=agent,
+                            tools=self.tools,
+                            verbose=True,
+                            handle_parsing_errors=True,
+                            max_iterations=3
+                        )
+                        self.hybrid_caller = None
+                    else:
+                        logger.info(f"Using fallback function calling for OpenRouter model {model_name} (no native support)")
+                        # Use fallback approach for models without native support
+                        use_catalan = (self.agent_type == "softcatala_catalan")
+                        self.hybrid_caller = HybridFunctionCaller(new_provider, new_model, self.tools, use_catalan=use_catalan)
+                        
+                        # Create a simple chain as the agent executor for fallback mode
+                        self.agent_executor = prompt | new_model
+                else:
+                    # Use standard LangChain agent for other providers
+                    agent = create_openai_tools_agent(new_model, self.tools, prompt)
+                    self.agent_executor = AgentExecutor(
+                        agent=agent,
+                        tools=self.tools,
+                        verbose=True,
+                        handle_parsing_errors=True,
+                        max_iterations=3
+                    )
+                    self.hybrid_caller = None
             else:
                 self.agent_executor = prompt | new_model
+                self.hybrid_caller = None
                 
             logger.info(f"Switched to model {model_name} from provider {provider} with agent executor type {type(self.agent_executor)}")
             
@@ -651,8 +718,28 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             raise
 
     def get_current_model(self) -> str:
-        """Get the current model."""
-        return ""
-        model_config = self.agent_executor.get
-        logger.info(f"Model config: {model_config}")
-        return json.dumps(self.agent_executor.model_config)
+        """Get the current model name."""
+        try:
+            if not self.current_model:
+                logger.warning("No current model stored")
+                return "unknown"
+            
+            # Try to extract model name from different possible attributes
+            model_name = getattr(self.current_model, 'model_name', None)
+            if not model_name:
+                model_name = getattr(self.current_model, 'model', None)
+            if not model_name:
+                model_name = getattr(self.current_model, 'name', None)
+            
+            if model_name:
+                logger.info(f"Current model: {model_name}")
+                return model_name
+            else:
+                # Fallback to string representation
+                model_str = str(self.current_model)
+                logger.info(f"Current model (fallback): {model_str}")
+                return model_str
+                
+        except Exception as e:
+            logger.error(f"Error getting current model: {e}")
+            return "unknown"

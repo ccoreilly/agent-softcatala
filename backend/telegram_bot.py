@@ -717,17 +717,18 @@ class TelegramBot:
                     filtered_response = self._filter_tool_information(full_response, debug_enabled)
                     
                     # Send the response as a new message
-                    await self._send_split_message(
-                        chat_id=int(chat_id),
-                        content=f"🤖 {filtered_response}",
-                        parse_mode=ParseMode.MARKDOWN
-                    )
+                    # await self._send_split_message(
+                    #     chat_id=int(chat_id),
+                    #     content=f"🤖 {filtered_response}",
+                    #     parse_mode=ParseMode.MARKDOWN
+                    # )
                     
                     # Delete or update the thinking message to show completion
                     message_key = f"{thinking_msg.chat_id}_{thinking_msg.message_id}"
                     await self.safe_edit_message(
                         thinking_msg,
-                        "✅ Resposta completada",
+                        new_content=filtered_response,
+                        parse_mode=ParseMode.MARKDOWN,
                         message_key=message_key
                     )
                     

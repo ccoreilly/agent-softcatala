@@ -6,32 +6,32 @@ import logging
 import time
 from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage, SystemMessage
 from langchain_core.tools import BaseTool
 
 logger = logging.getLogger(__name__)
 
 
 class HybridFunctionCaller:
-    """Hybrid function calling implementation that supports both native and text-based function calling."""
+    """Fallback function calling implementation for models that don't support native function calling."""
     
-    def __init__(self, provider, model, tools: List[BaseTool] = None):
-        """Initialize the hybrid function caller.
+    def __init__(self, provider, model, tools: List[BaseTool] = None, use_catalan: bool = False):
+        """Initialize the fallback function caller.
         
         Args:
             provider: OpenRouter provider instance
             model: The language model instance
             tools: List of available tools
+            use_catalan: Whether to use Catalan language for fallback prompts
         """
         self.provider = provider
         self.model = model
         self.tools = tools or []
         self.tools_by_name = {tool.name: tool for tool in self.tools}
+        self.use_catalan = use_catalan
         
-        # Determine if the model supports native function calling
-        model_name = getattr(model, 'model_name', getattr(model, 'model', 'unknown'))
-        self.supports_native = provider.supports_native_function_calling(model_name)
-        logger.info(f"Model {model_name} native function calling: {self.supports_native}")
+        logger.info(f"Fallback function caller initialized with {len(self.tools)} tools")
+        logger.info(f"Using Catalan fallback prompts: {self.use_catalan}")
     
     def _extract_tool_call_from_text(self, text: str) -> Optional[Dict[str, Any]]:
         """Extract tool call from text response using regex pattern."""
@@ -82,12 +82,47 @@ class HybridFunctionCaller:
         """Create a prompt for text-based function calling."""
         if not self.tools:
             return messages[-1].content if messages else ""
-            
+        
+        if self.use_catalan:
+            return self._create_catalan_fallback_prompt(messages)
+        else:
+            return self._create_english_fallback_prompt(messages)
+    
+    def _create_english_fallback_prompt(self, messages: List[BaseMessage]) -> str:
+        """Create an English prompt for text-based function calling."""
         prompt = """At each turn, if you decide to invoke any of the function(s), it should be wrapped with ```tool_code```. The python methods described below are imported and available, you can only use defined methods. The generated code should be readable and efficient. The response to a method will be wrapped in ```tool_output``` use it to call more tools or generate a helpful, friendly response. When using a ```tool_call``` think step by step why and how it should be used.
 
 The following Python methods are available:
 
 """
+        return self._build_prompt_with_tools(prompt, messages, "User", "Assistant")
+    
+    def _create_catalan_fallback_prompt(self, messages: List[BaseMessage]) -> str:
+        """Create a Catalan prompt for text-based function calling."""
+        prompt = """En cada torn, si decideixes invocar qualsevol de les funcions, ha d'estar embolcallada amb ```tool_code```. Els mètodes python descrits a continuació estan importats i disponibles, només pots utilitzar mètodes definits. El codi generat ha de ser llegible i eficient. La resposta a un mètode s'embolcallarà amb ```tool_output``` utilitzeu-lo per cridar més eines o generar una resposta útil i amigable. Quan utilitzis un ```tool_call``` pensa pas a pas per què i com s'ha d'utilitzar.
+
+Els següents mètodes Python estan disponibles:
+
+"""
+        return self._build_prompt_with_tools(prompt, messages, "Usuari", "Assistent")
+    
+    def _build_prompt_with_tools(self, base_prompt: str, messages: List[BaseMessage], user_label: str, assistant_label: str) -> str:
+        """Build the complete prompt with tool definitions and conversation history."""
+        # Extract system messages and combine with function calling instructions
+        system_content = ""
+        conversation_messages = []
+        
+        for msg in messages:
+            if isinstance(msg, SystemMessage):
+                system_content += msg.content + "\n\n"
+            else:
+                conversation_messages.append(msg)
+        
+        # Start with system content if available
+        if system_content:
+            prompt = system_content.strip() + "\n\n" + base_prompt
+        else:
+            prompt = base_prompt
         
         # Add function definitions
         for tool in self.tools:
@@ -128,13 +163,13 @@ The following Python methods are available:
             else:
                 prompt += f"```python\ndef {name}():\n    \"\"\"{description}\"\"\"\n```\n\n"
         
-        # Add conversation history and current message
+        # Add conversation history (excluding system messages)
         conversation = ""
-        for msg in messages:
+        for msg in conversation_messages:
             if isinstance(msg, HumanMessage):
-                conversation += f"User: {msg.content}\n"
+                conversation += f"{user_label}: {msg.content}\n"
             elif isinstance(msg, AIMessage):
-                conversation += f"Assistant: {msg.content}\n"
+                conversation += f"{assistant_label}: {msg.content}\n"
         
         prompt += conversation
         return prompt
@@ -156,30 +191,27 @@ The following Python methods are available:
             "timestamp": datetime.now().isoformat(),
             "message_count": len(messages),
             "messages": formatted_messages,
-            "supports_native": self.supports_native,
+            "use_catalan": self.use_catalan,
             "tools_available": [tool.name for tool in self.tools]
         }
         
-        logger.info(f"📋 HYBRID CALLER MESSAGE CHAIN ({context}): {json.dumps(log_entry, indent=2, ensure_ascii=False)}")
+        logger.info(f"📋 FALLBACK CALLER MESSAGE CHAIN ({context}): {json.dumps(log_entry, indent=2, ensure_ascii=False)}")
     
     async def call_with_tools(self, messages: List[BaseMessage]) -> BaseMessage:
-        """Call the model with tools, using native or fallback approach."""
+        """Call the model with tools using fallback function calling approach."""
         start_time = time.time()
-        call_id = f"hybrid_call_{int(time.time() * 1000)}"
+        call_id = f"fallback_call_{int(time.time() * 1000)}"
         
         # Log the input message chain
         self._log_messages_chain(messages, f"call_input_{call_id}")
         
-        logger.info(f"🔀 HYBRID FUNCTION CALLER START (ID: {call_id}):")
-        logger.info(f"  📊 Native support: {self.supports_native}")
+        logger.info(f"🔄 FALLBACK FUNCTION CALLER START (ID: {call_id}):")
         logger.info(f"  🔧 Tools available: {len(self.tools)}")
         logger.info(f"  📝 Tool names: {[tool.name for tool in self.tools]}")
+        logger.info(f"  🌍 Language: {'Catalan' if self.use_catalan else 'English'}")
         
         try:
-            if self.supports_native and self.tools:
-                logger.info(f"  ✨ Using NATIVE function calling for {call_id}")
-                result = await self._call_with_native_tools(messages)
-            elif self.tools:
+            if self.tools:
                 logger.info(f"  🔄 Using FALLBACK function calling for {call_id}")
                 result = await self._call_with_fallback_tools(messages)
             else:
@@ -195,10 +227,10 @@ The following Python methods are available:
                 "duration_ms": duration_ms,
                 "result_type": type(result).__name__,
                 "result_content": result.content if hasattr(result, 'content') else str(result),
-                "tool_calls": getattr(result, 'tool_calls', None)
+                "language": "catalan" if self.use_catalan else "english"
             }
             
-            logger.info(f"✅ HYBRID FUNCTION CALLER SUCCESS ({call_id}): {json.dumps(result_log, indent=2, ensure_ascii=False)}")
+            logger.info(f"✅ FALLBACK FUNCTION CALLER SUCCESS ({call_id}): {json.dumps(result_log, indent=2, ensure_ascii=False)}")
             return result
             
         except Exception as e:
@@ -209,51 +241,14 @@ The following Python methods are available:
                 "timestamp": datetime.now().isoformat(),
                 "duration_ms": duration_ms,
                 "error": str(e),
-                "error_type": type(e).__name__
+                "error_type": type(e).__name__,
+                "language": "catalan" if self.use_catalan else "english"
             }
             
-            logger.error(f"❌ HYBRID FUNCTION CALLER ERROR ({call_id}): {json.dumps(error_log, indent=2, ensure_ascii=False)}")
+            logger.error(f"❌ FALLBACK FUNCTION CALLER ERROR ({call_id}): {json.dumps(error_log, indent=2, ensure_ascii=False)}")
             raise
     
-    async def _call_with_native_tools(self, messages: List[BaseMessage]) -> BaseMessage:
-        """Handle native function calling."""
-        try:
-            # Bind tools to the model
-            model_with_tools = self.model.bind_tools(self.tools)
-            response = await model_with_tools.ainvoke(messages)
-            
-            # Check if response contains tool calls
-            if hasattr(response, 'tool_calls') and response.tool_calls:
-                # Execute tool calls
-                for tool_call in response.tool_calls:
-                    tool_name = tool_call['name']
-                    tool_args = tool_call['args']
-                    
-                    if tool_name in self.tools_by_name:
-                        try:
-                            tool = self.tools_by_name[tool_name]
-                            result = await tool.ainvoke(tool_args)
-                            
-                            # Create tool message
-                            tool_message = ToolMessage(
-                                content=str(result),
-                                tool_call_id=tool_call['id']
-                            )
-                            
-                            # Get final response with tool result
-                            final_messages = messages + [response, tool_message]
-                            final_response = await model_with_tools.ainvoke(final_messages)
-                            return final_response
-                            
-                        except Exception as e:
-                            logger.error(f"Error executing tool {tool_name}: {e}")
-                            return AIMessage(content=f"Error executing tool {tool_name}: {str(e)}")
-            
-            return response
-            
-        except Exception as e:
-            logger.warning(f"Native function calling failed: {e}, falling back to text-based approach")
-            return await self._call_with_fallback_tools(messages)
+
     
     async def _call_with_fallback_tools(self, messages: List[BaseMessage]) -> BaseMessage:
         """Handle text-based function calling fallback."""
