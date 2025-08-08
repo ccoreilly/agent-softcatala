@@ -35,7 +35,6 @@ jest.mock('../lib/utils', () => ({
 jest.mock('@assistant-ui/react', () => ({
   AssistantRuntimeProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Thread: () => <div data-testid="thread">Thread Component</div>,
-  Composer: () => <div data-testid="composer">Composer Component</div>,
   useLocalRuntime: () => ({
     // Mock runtime object
     status: 'ready',
