@@ -106,6 +106,13 @@ class ModelManager:
         
         return self.providers[provider_enum].get_model(model_name, **kwargs)
     
+    def get_provider(self, provider: str) -> BaseChatModel:
+        """Get a specific provider."""
+        provider_enum = ModelProvider(provider.lower())
+        if provider_enum not in self.providers:
+            raise ValueError(f"Provider {provider} not available")
+        return self.providers[provider_enum]
+    
     def list_available_models(self) -> Dict[str, List[str]]:
         """List all available models from all providers."""
         models = {}
