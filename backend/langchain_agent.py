@@ -317,6 +317,11 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                 "chat_history": chat_history
             }
             
+            # Add agent_scratchpad only if we're using an AgentExecutor (not for simple chains)
+            # This fixes the issue when switching between native tool-calling and fallback models
+            if isinstance(self.agent_executor, AgentExecutor):
+                agent_input["agent_scratchpad"] = []
+            
             # Configure comprehensive logging with streaming callback
             streaming_callback = StreamingCallbackHandler(
                 lambda chunk: self._emit_chunk(chunk)

@@ -89,6 +89,56 @@ def sample_health_response():
     }
 
 
+@pytest.fixture
+def mock_langchain_agent():
+    """Mock LangChain agent for testing."""
+    from unittest.mock import AsyncMock, Mock
+    
+    # Create a mock agent with the expected interface
+    agent = Mock()
+    agent.current_model = "test-model"
+    
+    # Mock async methods
+    agent.check_health = AsyncMock(return_value={"status": "healthy"})
+    agent.get_available_models = AsyncMock(return_value=["test-model-1", "test-model-2"])
+    agent.switch_model = Mock(return_value=True)
+    
+    # Mock chat streaming
+    async def mock_chat_stream(messages, session_id="test"):
+        """Mock chat streaming that yields test chunks."""
+        chunks = [
+            {"type": "content", "content": "Hello "},
+            {"type": "content", "content": "world!"}
+        ]
+        for chunk in chunks:
+            yield chunk
+    
+    agent.chat_stream = mock_chat_stream
+    
+    # Update current_model when switch_model is called
+    def switch_model_side_effect(model_name):
+        agent.current_model = model_name
+        return True
+    
+    agent.switch_model.side_effect = switch_model_side_effect
+    
+    return agent
+
+
+@pytest.fixture
+def mock_fastapi_app():
+    """Mock FastAPI app for testing."""
+    from unittest.mock import Mock
+    
+    app = Mock()
+    app.routes = [Mock(), Mock(), Mock()]  # Mock some routes
+    app.mount = Mock()
+    app.add_middleware = Mock()
+    app.include_router = Mock()
+    
+    return app
+
+
 # Pytest configuration
 def pytest_configure(config):
     """Configure pytest with custom markers."""

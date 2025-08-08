@@ -97,12 +97,35 @@ class TestPromptTemplateFix:
         # Mock the model manager and its methods
         mock_model_instance = Mock()
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
+        mock_model_manager.return_value.get_provider_for_default_model.return_value = Mock()
         
-        # Create mock tools
-        mock_tool = Mock()
-        mock_tool.name = "test_tool"
-        mock_tool.description = "A test tool"
-        mock_tool.definition = {"name": "test_tool", "description": "A test tool"}
+        # Create mock tools with proper structure
+        from tools.base import BaseTool, ToolDefinition, ToolParameter
+        
+        class MockTool(BaseTool):
+            def __init__(self):
+                super().__init__()
+                self._definition = ToolDefinition(
+                    name="test_tool",
+                    description="A test tool",
+                    parameters=[
+                        ToolParameter(
+                            name="input",
+                            type="string",
+                            description="Test input parameter",
+                            required=True
+                        )
+                    ]
+                )
+            
+            @property
+            def definition(self) -> ToolDefinition:
+                return self._definition
+            
+            async def execute(self, **kwargs):
+                return {"result": "test output"}
+        
+        mock_tool = MockTool()
         
         # Test agent creation should not raise KeyError about missing variables
         try:
@@ -122,6 +145,7 @@ class TestPromptTemplateFix:
         # Mock the model manager and its methods
         mock_model_instance = Mock()
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
+        mock_model_manager.return_value.get_provider_for_default_model.return_value = Mock()
         
         # Test agent creation should not raise KeyError about missing variables
         try:
@@ -146,6 +170,7 @@ class TestTelegramChatFunctionality:
         # Mock the model manager
         mock_model_instance = Mock()
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
+        mock_model_manager.return_value.get_provider_for_default_model.return_value = Mock()
         
         # Create agent
         agent = LangChainAgent(tools=[], agent_type="softcatala_english")
@@ -187,6 +212,7 @@ class TestTelegramChatFunctionality:
         # Mock the model manager
         mock_model_instance = Mock()
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
+        mock_model_manager.return_value.get_provider_for_default_model.return_value = Mock()
         
         # Create agent and telegram bot
         agent = LangChainAgent(tools=[], agent_type="softcatala_english")
@@ -229,6 +255,7 @@ class TestBackwardCompatibility:
         """Test that both English and Catalan agent types work."""
         mock_model_instance = Mock()
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
+        mock_model_manager.return_value.get_provider_for_default_model.return_value = Mock()
         
         # Test English agent
         english_agent = LangChainAgent(tools=[], agent_type="softcatala_english")
@@ -251,12 +278,35 @@ class TestBackwardCompatibility:
         """Test that tools are still properly integrated despite prompt changes."""
         mock_model_instance = Mock()
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
+        mock_model_manager.return_value.get_provider_for_default_model.return_value = Mock()
         
-        # Create mock tool
-        mock_tool = Mock()
-        mock_tool.name = "search_tool"
-        mock_tool.description = "A search tool"
-        mock_tool.definition = {"name": "search_tool", "description": "A search tool"}
+        # Create mock tool with proper structure
+        from tools.base import BaseTool, ToolDefinition, ToolParameter
+        
+        class MockSearchTool(BaseTool):
+            def __init__(self):
+                super().__init__()
+                self._definition = ToolDefinition(
+                    name="search_tool",
+                    description="A search tool",
+                    parameters=[
+                        ToolParameter(
+                            name="query",
+                            type="string",
+                            description="Search query",
+                            required=True
+                        )
+                    ]
+                )
+            
+            @property
+            def definition(self) -> ToolDefinition:
+                return self._definition
+            
+            async def execute(self, **kwargs):
+                return {"result": "search results"}
+        
+        mock_tool = MockSearchTool()
         
         # Create agent with tools
         agent = LangChainAgent(tools=[mock_tool], agent_type="softcatala_english")

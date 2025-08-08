@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AssistantRuntimeProvider, useLocalRuntime, Thread, Composer } from '@assistant-ui/react';
+import { AssistantRuntimeProvider, useLocalRuntime, Thread } from '@assistant-ui/react';
 import { chatAgentAdapter } from './lib/transport';
 import { ChatSession } from './types';
 import { storage } from './utils/storage';
