@@ -87,7 +87,7 @@ Edit `.env` to configure additional options:
 # LLM Model Configuration
 LLM_MODEL=llama3.2                  # Choose your model
 OLLAMA_URL=http://ollama:11434      # Ollama service URL
-CORS_ORIGINS=http://localhost:3000  # Allowed origins
+CORS_ORIGINS=http://localhost:3000,https://ccoreilly.github.io  # Allowed origins
 
 # Agent Configuration
 AGENT_TYPE=softcatala_english       # Agent type: softcatala_english (default) or softcatala_catalan
