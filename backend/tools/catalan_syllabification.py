@@ -165,7 +165,7 @@ class CatalanSyllabificationTool(BaseTool):
         result = ""
         for i in range(len(word)):
             if levels[i] % 2 == 1:
-                result += "·"
+                result += "-"
             result += word[i]
         
         return result
