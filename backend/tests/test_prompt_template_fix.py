@@ -214,9 +214,8 @@ class TestTelegramChatFunctionality:
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
         mock_model_manager.return_value.get_provider_for_default_model.return_value = Mock()
         
-        # Create agent and telegram bot
-        agent = LangChainAgent(tools=[], agent_type="softcatala_english")
-        telegram_bot = TelegramBot("fake_token", agent, max_user_messages=10)
+        # Create telegram bot (agent is created per-message now)
+        telegram_bot = TelegramBot("fake_token", "softcatala_english", max_user_messages=10)
         
         # Mock the agent's chat_stream method
         async def mock_chat_stream(*args, **kwargs):

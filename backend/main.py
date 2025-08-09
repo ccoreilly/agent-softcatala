@@ -291,7 +291,8 @@ async def start_telegram_bot():
         # Get max user messages from environment (default 20)
         max_user_messages = int(os.getenv("TELEGRAM_MAX_USER_MESSAGES", "20"))
         
-        telegram_bot = TelegramBot(telegram_token, agent, max_user_messages)
+        # Pass agent type instead of agent instance
+        telegram_bot = TelegramBot(telegram_token, agent_type, max_user_messages)
         await telegram_bot.start_bot()
         
     except asyncio.CancelledError:

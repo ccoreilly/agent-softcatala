@@ -22,9 +22,8 @@ class TestTelegramDebugMode:
         mock_model_instance = Mock()
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
         
-        # Create agent and telegram bot
-        agent = LangChainAgent(tools=[], agent_type="softcatala_english")
-        telegram_bot = TelegramBot("fake_token", agent, max_user_messages=10)
+        # Create telegram bot (agent is created per-message now)
+        telegram_bot = TelegramBot("fake_token", "softcatala_english", max_user_messages=10)
         
         # Enable debug mode for test chat
         chat_id = "12345"
@@ -37,7 +36,12 @@ class TestTelegramDebugMode:
             yield {"type": "tool_error", "tool": "test_tool", "error": "Test error", "timestamp": "2023-01-01 12:00:02"}
             yield {"type": "content", "content": "Final response"}
         
-        agent.chat_stream = mock_chat_stream
+        # Mock the _create_agent_for_user method to return an agent with our mock chat_stream
+        def mock_create_agent_for_user(chat_id):
+            mock_agent = Mock()
+            mock_agent.chat_stream = mock_chat_stream
+            return mock_agent
+        telegram_bot._create_agent_for_user = mock_create_agent_for_user
         
         # Mock Telegram update and context
         mock_update = Mock()
@@ -89,9 +93,8 @@ class TestTelegramDebugMode:
         mock_model_instance = Mock()
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
         
-        # Create agent and telegram bot
-        agent = LangChainAgent(tools=[], agent_type="softcatala_english")
-        telegram_bot = TelegramBot("fake_token", agent, max_user_messages=10)
+        # Create telegram bot (agent is created per-message now)
+        telegram_bot = TelegramBot("fake_token", "softcatala_english", max_user_messages=10)
         
         # Ensure debug mode is disabled for test chat (default state)
         chat_id = "12345"
@@ -105,7 +108,12 @@ class TestTelegramDebugMode:
             yield {"type": "tool_error", "tool": "test_tool", "error": "Test error", "timestamp": "2023-01-01 12:00:02"}
             yield {"type": "content", "content": "Final response"}
         
-        agent.chat_stream = mock_chat_stream
+        # Mock the _create_agent_for_user method to return an agent with our mock chat_stream
+        def mock_create_agent_for_user(chat_id):
+            mock_agent = Mock()
+            mock_agent.chat_stream = mock_chat_stream
+            return mock_agent
+        telegram_bot._create_agent_for_user = mock_create_agent_for_user
         
         # Mock Telegram update and context
         mock_update = Mock()
@@ -162,9 +170,8 @@ class TestTelegramDebugMode:
         mock_model_instance = Mock()
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
         
-        # Create agent and telegram bot
-        agent = LangChainAgent(tools=[], agent_type="softcatala_english")
-        telegram_bot = TelegramBot("fake_token", agent, max_user_messages=10)
+        # Create telegram bot (agent is created per-message now)
+        telegram_bot = TelegramBot("fake_token", "softcatala_english", max_user_messages=10)
         
         chat_id = "12345"
         
@@ -206,9 +213,8 @@ class TestTelegramDebugMode:
         mock_model_instance = Mock()
         mock_model_manager.return_value.get_default_model.return_value = mock_model_instance
         
-        # Create agent and telegram bot
-        agent = LangChainAgent(tools=[], agent_type="softcatala_english")
-        telegram_bot = TelegramBot("fake_token", agent, max_user_messages=10)
+        # Create telegram bot (agent is created per-message now)
+        telegram_bot = TelegramBot("fake_token", "softcatala_english", max_user_messages=10)
         
         chat_id_1 = "12345"
         chat_id_2 = "67890"

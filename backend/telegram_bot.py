@@ -10,6 +10,11 @@ from telegram.constants import ChatAction, ParseMode
 
 from langchain_agent import LangChainAgent
 from message_history import MessageHistory
+from tools.catalan_synonyms import CatalanSynonymsTool
+from tools.catalan_spell_checker import CatalanSpellCheckerTool
+from tools.catalan_verbs import CatalanVerbsTool
+from tools.catalan_syllabification import CatalanSyllabificationTool
+from tools.catalan_translator import CatalanTranslatorTool
 
 # Configure logging
 log_level = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -25,17 +30,17 @@ class TelegramBot:
     Telegram bot that integrates with LangChain agent and manages message history.
     """
     
-    def __init__(self, token: str, agent: LangChainAgent, max_user_messages: int = 20):
+    def __init__(self, token: str, agent_type: str = "softcatala_english", max_user_messages: int = 20):
         """
         Initialize the Telegram bot.
         
         Args:
             token: Telegram bot token
-            agent: LangChain agent instance
+            agent_type: Type of agent - "softcatala_english" (default) or "softcatala_catalan"
             max_user_messages: Maximum number of user messages to keep in history
         """
         self.token = token
-        self.agent = agent
+        self.agent_type = agent_type
         self.message_history = MessageHistory(max_user_messages)
         self.application = None
         self.bot = Bot(token=token)
@@ -46,6 +51,65 @@ class TelegramBot:
         self.last_message_content: Dict[str, str] = {}
         # Track debug mode for each chat
         self.debug_mode: Dict[str, bool] = {}
+        # Track per-user model preferences (chat_id -> {"provider": str, "model": str})
+        self.user_model_preferences: Dict[str, Dict[str, str]] = {}
+    
+    def _create_tools(self) -> List:
+        """Create and return the list of tools for the agent."""
+        try:
+            return [
+                CatalanSynonymsTool(),
+                CatalanSpellCheckerTool(),
+                CatalanVerbsTool(),
+                CatalanSyllabificationTool(),
+                CatalanTranslatorTool()
+            ]
+        except Exception as e:
+            logger.error(f"Failed to initialize tools: {e}")
+            return []
+    
+    def _create_agent_for_user(self, chat_id: str) -> LangChainAgent:
+        """
+        Create a LangChain agent instance for a specific user with their model preferences.
+        
+        Args:
+            chat_id: Chat ID to get user preferences for
+            
+        Returns:
+            LangChainAgent instance configured for the user
+        """
+        try:
+            # Create tools
+            tools = self._create_tools()
+            
+            # Create agent with user's agent type
+            agent = LangChainAgent(tools=tools, agent_type=self.agent_type)
+            
+            # Set user-specific model if they have a preference
+            user_prefs = self.user_model_preferences.get(chat_id)
+            if user_prefs and "provider" in user_prefs and "model" in user_prefs:
+                try:
+                    agent.switch_model(user_prefs["provider"], user_prefs["model"])
+                    logger.info(f"Set model {user_prefs['provider']}/{user_prefs['model']} for user {chat_id}")
+                except Exception as e:
+                    logger.warning(f"Failed to set user model for {chat_id}: {e}")
+            
+            return agent
+            
+        except Exception as e:
+            logger.error(f"Failed to create agent for user {chat_id}: {e}")
+            # Fallback: create agent without tools
+            agent = LangChainAgent(tools=[], agent_type=self.agent_type)
+            
+            # Still try to set user model preference if available
+            user_prefs = self.user_model_preferences.get(chat_id)
+            if user_prefs and "provider" in user_prefs and "model" in user_prefs:
+                try:
+                    agent.switch_model(user_prefs["provider"], user_prefs["model"])
+                except Exception:
+                    pass  # Silent fallback
+            
+            return agent
     
     def setup_handlers(self) -> None:
         """Set up command and message handlers."""
@@ -137,14 +201,19 @@ class TelegramBot:
         user_messages = self.message_history.get_user_message_count(chat_id)
         total_messages = self.message_history.get_total_message_count(chat_id)
 
-        current_model = self.agent.get_current_model()
+        # Get current model for this user
+        user_prefs = self.user_model_preferences.get(chat_id)
+        if user_prefs and "provider" in user_prefs and "model" in user_prefs:
+            current_model = f"{user_prefs['provider']}/{user_prefs['model']}"
+        else:
+            current_model = "default (sistema)"
         
         history_message = (
             f"📊 *Estadístiques de Conversa*\n\n"
             f"👤 Els teus missatges: {user_messages}\n"
             f"🤖 Missatges totals: {total_messages}\n"
             f"📝 Màxim de missatges d'usuari emmagatzemats: {self.message_history.max_user_messages}\n\n"
-            f"🤖 Model actual: {current_model}\n\n"
+            f"🤖 El teu model: {current_model}\n\n"
             f"Utilitza /clear per restablir l'historial de conversa."
         )
         
@@ -181,10 +250,21 @@ class TelegramBot:
     
     async def models_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /models command to list available models."""
+        chat_id = str(update.effective_chat.id)
+        
         try:
-            models_info = await self.agent.get_available_models()
+            # Create a temporary agent to get available models
+            temp_agent = self._create_agent_for_user(chat_id)
+            models_info = await temp_agent.get_available_models()
             
             models_message = "🧠 *Models d'IA Disponibles*\n\n"
+            
+            # Show current user model preference
+            user_prefs = self.user_model_preferences.get(chat_id)
+            if user_prefs and "provider" in user_prefs and "model" in user_prefs:
+                models_message += f"🔧 *El teu model actual:* `{user_prefs['provider']}/{user_prefs['model']}`\n\n"
+            else:
+                models_message += f"🔧 *El teu model actual:* sistema predeterminat\n\n"
             
             for provider, models in models_info.items():
                 if models:  # Only show providers that have models
@@ -207,11 +287,22 @@ class TelegramBot:
     
     async def model_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /model command to switch models."""
+        chat_id = str(update.effective_chat.id)
+        
         try:
             # Parse arguments
             if not context.args or len(context.args) < 2:
+                # Show current user model preference in help message
+                user_prefs = self.user_model_preferences.get(chat_id)
+                current_model_text = ""
+                if user_prefs and "provider" in user_prefs and "model" in user_prefs:
+                    current_model_text = f"🔧 *El teu model actual:* `{user_prefs['provider']}/{user_prefs['model']}`\n\n"
+                else:
+                    current_model_text = "🔧 *El teu model actual:* sistema predeterminat\n\n"
+                
                 help_message = (
                     "🔧 *Canvi de Model*\n\n"
+                    f"{current_model_text}"
                     "*Ús:* `/model [proveïdor] [model]`\n\n"
                     "*Exemples:*\n"
                     "• `/model openrouter openai/gpt-oss-20b:free`\n"
@@ -225,18 +316,25 @@ class TelegramBot:
             provider = context.args[0].lower()
             model_name = context.args[1]
             
-            # Try to switch the model
-            self.agent.switch_model(provider, model_name)
+            # Try to validate the model by creating a temporary agent and switching
+            temp_agent = self._create_agent_for_user(chat_id)
+            temp_agent.switch_model(provider, model_name)
+            
+            # If successful, store the user preference
+            self.user_model_preferences[chat_id] = {
+                "provider": provider,
+                "model": model_name
+            }
             
             success_message = (
-                f"✅ *Model canviat correctament!*\n\n"
+                f"✅ *El teu model s'ha canviat correctament!*\n\n"
                 f"🔧 **Proveïdor:** `{provider}`\n"
                 f"🧠 **Model:** `{model_name}`\n\n"
-                f"Ara pots començar a fer preguntes amb el nou model. 🚀"
+                f"Aquest model s'utilitzarà només per a les teves converses. Ara pots començar a fer preguntes! 🚀"
             )
             
             await update.message.reply_text(success_message, parse_mode=ParseMode.MARKDOWN)
-            logger.info(f"Model switched to {provider}/{model_name} for chat {update.effective_chat.id}")
+            logger.info(f"Model preference set to {provider}/{model_name} for user {chat_id}")
             
         except ValueError as e:
             error_message = (
@@ -252,7 +350,7 @@ class TelegramBot:
                 f"`{str(e)}`\n\n"
                 f"🔄 Si us plau, torna-ho a intentar o utilitza `/models` per veure opcions vàlides."
             )
-            logger.error(f"Error in model command: {e}")
+            logger.error(f"Error in model command for user {chat_id}: {e}")
             await update.message.reply_text(error_message, parse_mode=ParseMode.MARKDOWN)
     
     def _escape_markdown_v2(self, text: str) -> str:
@@ -539,6 +637,9 @@ class TelegramBot:
             # Get conversation history for context
             history = self.message_history.get_history(chat_id)
             
+            # Create a fresh agent instance for this user with their model preference
+            agent = self._create_agent_for_user(chat_id)
+            
             # Send message to agent with streaming
             response_parts = []
             full_response = ""
@@ -547,7 +648,7 @@ class TelegramBot:
             thinking_msg = await update.message.reply_text("🤔 Pensant...")
             
             try:
-                async for chunk in self.agent.chat_stream(history, chat_id):
+                async for chunk in agent.chat_stream(history, chat_id):
                     chunk_type = chunk.get("type")
                     
                     if chunk_type == "content":
