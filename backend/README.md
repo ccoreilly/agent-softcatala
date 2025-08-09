@@ -30,7 +30,7 @@ export OPENAI_KEY=your_openai_api_key
 export OPENROUTER_API_KEY=your_openrouter_api_key
 
 # Optional configurations
-export CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+export CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://ccoreilly.github.io
 export TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 export TELEGRAM_MAX_USER_MESSAGES=20
 export SEARCH_API_KEY=your_search_api_key
@@ -61,7 +61,7 @@ OPENROUTER_API_KEY=your_openrouter_api_key
 # ZHIPUAI_BASE_URL=https://open.bigmodel.cn/api/paas/v4/
 
 # Optional: CORS configuration
-CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,https://ccoreilly.github.io
 
 # Optional: Telegram Bot Configuration
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token

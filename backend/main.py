@@ -61,7 +61,7 @@ app = FastAPI(title="API de l'Agent de Softcatalà", version="2.0.0")
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000").split(","),
+    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3000,https://ccoreilly.github.io").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
