@@ -15,7 +15,7 @@ class CatalanVerbsTool(BaseTool):
             }
         )
         # Using a fallback base URL that can be configured
-        self.base_url = "https://conjugador.softcatala.org"
+        self.base_url = "https://api.softcatala.org/conjugador/v1"
     
     @property
     def definition(self) -> ToolDefinition:
@@ -115,10 +115,10 @@ class CatalanVerbsTool(BaseTool):
             
             if response.status_code == 200:
                 # The response might be HTML, so we need to parse it
-                content = response.text
+                content = response.json()
                 
                 # Check if verb was found (basic HTML parsing)
-                if "No s'ha trobat cap verb" in content or "error" in content.lower():
+                if not content or len(content) == 0:
                     return {
                         "verb": verb,
                         "found": False,
@@ -126,16 +126,7 @@ class CatalanVerbsTool(BaseTool):
                         "status": "not_found"
                     }
                 
-                # For now, return a simplified response indicating success
-                # In a full implementation, you would parse the HTML to extract conjugation tables
-                return {
-                    "verb": verb,
-                    "found": True,
-                    "message": f"Conjugation forms found for '{verb}'",
-                    "conjugation_url": url,
-                    "status": "success",
-                    "note": "Visit the URL for complete conjugation table"
-                }
+                return content
             else:
                 return {
                     "error": f"HTTP {response.status_code}: Failed to fetch conjugation data",
@@ -156,18 +147,11 @@ class CatalanVerbsTool(BaseTool):
             response = await self.client.get(url)
             
             if response.status_code == 200:
-                content = response.text
+                content = response.json()
                 
                 # Parse the response (would need proper HTML parsing in production)
                 # For now, return a basic success response
-                return {
-                    "partial_verb": partial_verb,
-                    "suggestions": [],  # Would contain actual suggestions from HTML parsing
-                    "autocomplete_url": url,
-                    "max_results": max_results,
-                    "status": "success",
-                    "note": "Visit the URL for autocomplete suggestions"
-                }
+                return content
             else:
                 return {
                     "error": f"HTTP {response.status_code}: Failed to fetch autocomplete data",
@@ -188,18 +172,11 @@ class CatalanVerbsTool(BaseTool):
             response = await self.client.get(url)
             
             if response.status_code == 200:
-                content = response.text
+                content = response.json()
                 
                 # Parse the response (would need proper HTML parsing in production)
                 # For now, return a basic success response
-                return {
-                    "prefix": prefix,
-                    "verbs": [],  # Would contain actual verb list from HTML parsing
-                    "index_url": url,
-                    "max_results": max_results,
-                    "status": "success",
-                    "note": "Visit the URL for complete verb index"
-                }
+                return content
             else:
                 return {
                     "error": f"HTTP {response.status_code}: Failed to fetch index data",
