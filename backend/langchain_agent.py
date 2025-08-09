@@ -622,24 +622,7 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             "agent": "healthy",
             "timestamp": datetime.now().isoformat()
         }
-        
-        # Check model manager health
-        try:
-            model_health = await self.model_manager.health_check()
-            health_status["models"] = model_health
-        except Exception as e:
-            health_status["models"] = {"error": str(e)}
-            health_status["agent"] = "unhealthy"
-        
-        # Check tools
-        health_status["tools"] = {
-            "count": len(self.tools),
-            "names": [tool.name for tool in self.tools]
-        }
-        
-        # Add agent type information
-        health_status["agent_type"] = self.agent_type
-        
+
         return health_status
     
     async def get_available_models(self) -> Dict[str, List[str]]:
