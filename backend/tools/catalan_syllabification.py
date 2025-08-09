@@ -191,7 +191,7 @@ class CatalanSyllabificationTool(BaseTool):
                 elif re.match(r'\w+', token):
                     # Syllabify words
                     syllabified = self._hyphenate_word(token)
-                    syllable_count = syllabified.count('·') + 1
+                    syllable_count = syllabified.count('-') + 1
                     syllabified_tokens.append(syllabified)
                     total_syllables += syllable_count
                 else:
