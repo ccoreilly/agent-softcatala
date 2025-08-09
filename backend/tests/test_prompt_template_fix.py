@@ -217,11 +217,15 @@ class TestTelegramChatFunctionality:
         # Create telegram bot (agent is created per-message now)
         telegram_bot = TelegramBot("fake_token", "softcatala_english", max_user_messages=10)
         
-        # Mock the agent's chat_stream method
+        # Create a mock agent with chat_stream method
+        mock_agent = Mock()
         async def mock_chat_stream(*args, **kwargs):
             yield {"type": "content", "content": "Test response from bot"}
         
-        agent.chat_stream = AsyncMock(side_effect=mock_chat_stream)
+        mock_agent.chat_stream = AsyncMock(side_effect=mock_chat_stream)
+        
+        # Mock the _create_agent_for_user method to return our mock agent
+        telegram_bot._create_agent_for_user = Mock(return_value=mock_agent)
         
         # Mock Telegram update and context
         mock_update = Mock()
@@ -237,7 +241,7 @@ class TestTelegramChatFunctionality:
             await telegram_bot.handle_message(mock_update, mock_context)
             
             # Verify that the message was processed
-            assert agent.chat_stream.called
+            assert mock_agent.chat_stream.called
         except KeyError as e:
             if "tools" in str(e) or "tool_names" in str(e):
                 pytest.fail(f"Telegram message handling failed due to prompt variable error: {e}")
