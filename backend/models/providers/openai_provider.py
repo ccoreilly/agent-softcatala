@@ -67,13 +67,9 @@ class OpenAIProvider(BaseProvider):
         # Note: OpenAI doesn't provide a public API endpoint to list all available models
         # so we return a curated list of common models
         return [
+            "gpt-4.1-nano",
             "gpt-4.1-mini",
-            "gpt-4o",
             "gpt-4o-mini",
-            "gpt-4-turbo",
-            "gpt-4",
-            "gpt-3.5-turbo",
-            "gpt-3.5-turbo-16k"
         ]
     
     def get_default_model(self) -> BaseChatModel:
