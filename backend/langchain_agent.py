@@ -109,10 +109,9 @@ class LangChainAgent:
             return text + reminder
         return text
     
-    def _get_softcatala_english_prompt(self):
+    def _get_softcatala_english_prompt(self) -> str:
         """Get the Softcatalà agent prompt in English (for better LLM performance)."""
-        return ChatPromptTemplate.from_messages([
-            ("system", """# Softcatalà AI Assistant
+        return """# Softcatalà AI Assistant
 
 You are a helpful AI Assistant from the Softcatalà non-profit association. Softcatalà has over 25 years of experience working to provide tools to navigate and experience information technologies in the Catalan language.
 
@@ -133,16 +132,11 @@ You have access to various tools that will be automatically available when neede
 ## How to Collaborate with Softcatalà
 
 If a user asks how they can collaborate with Softcatalà, tell them the best way is to encourage the usage of Catalan language when using information technologies. They should switch the language of all their devices into Catalan and if not possible request the localization to the manufacturers via social media. They should encourage friends and family to do the same.
-"""),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("human", "{input}"),
-            MessagesPlaceholder(variable_name="agent_scratchpad"),
-        ])
+"""
 
-    def _get_softcatala_catalan_prompt(self):
+    def _get_softcatala_catalan_prompt(self) -> str:
         """Get the Softcatalà agent prompt in Catalan."""
-        return ChatPromptTemplate.from_messages([
-            ("system", """# Assistent d'IA de Softcatalà
+        return """# Assistent d'IA de Softcatalà
 
 Ets un assistent d'intel·ligència artificial útil de l'associació sense ànim de lucre Softcatalà. Softcatalà té més de 25 anys d'experiència treballant per proporcionar eines per navegar i experimentar les tecnologies de la informació en llengua catalana.
 
@@ -173,24 +167,27 @@ Tens accés a diverses eines que estaran disponibles automàticament quan sigui 
 Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la millor manera és fomentar l'ús de la llengua catalana quan s'utilitzen tecnologies de la informació. Han de canviar l'idioma de tots els seus dispositius al català i, si no és possible, sol·licitar la localització als fabricants via xarxes socials. Han d'animar amics i familiars a fer el mateix.
 
 **RECORDATORI FINAL:** Respon SEMPRE en català, sense excepció.
-"""),
+"""
+
+    def get_system_prompt(self) -> str:
+        """Get the system prompt for the agent."""
+        if self.agent_type == "softcatala_catalan":
+            return self._get_softcatala_catalan_prompt()
+        else:
+            return self._get_softcatala_english_prompt()
+    
+    def get_chat_prompt_template(self) -> ChatPromptTemplate:
+        """Get the system prompt for the agent."""
+        return ChatPromptTemplate.from_messages([
+            ("system", self.get_system_prompt()),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
 
-
-
     def _setup_agent(self):
         """Setup the LangChain agent with tools and prompts."""
-        # Select prompt based on agent type
-        if self.agent_type == "softcatala_catalan":
-            prompt = self._get_softcatala_catalan_prompt()
-            logger.info("Using Catalan prompt")
-        else:
-            # Default to Softcatalà English prompt (includes softcatala_english and any unknown types)
-            prompt = self._get_softcatala_english_prompt()
-            logger.info("Using English prompt")
+        prompt = self.get_chat_prompt_template()
         
         try:
             # Get the default model and provider
@@ -232,7 +229,7 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                             tools=self.tools,
                             verbose=True,
                             handle_parsing_errors=True,
-                            max_iterations=3
+                            max_iterations=15
                         )
                         logger.info("AgentExecutor created successfully")
                         self.hybrid_caller = None
@@ -257,7 +254,7 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                         tools=self.tools,
                         verbose=True,
                         handle_parsing_errors=True,
-                        max_iterations=3
+                        max_iterations=15
                     )
                     logger.info("AgentExecutor created successfully")
                     self.hybrid_caller = None
@@ -347,20 +344,11 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             if hasattr(self, 'hybrid_caller') and self.hybrid_caller:
                 try:
                     logger.info("Using fallback function calling for OpenRouter model without native support")
-                    # Convert messages to LangChain format for hybrid caller
-                    langchain_messages = []
-                    for msg in [{"role": "system", "content": "You are a helpful assistant."}] + messages:
-                        role = msg.get("role", "")
-                        content = msg.get("content", "")
-                        
-                        if role == "user" or role == "human":
-                            langchain_messages.append(HumanMessage(content=content))
-                        elif role == "assistant" or role == "ai":
-                            langchain_messages.append(AIMessage(content=content))
-                        elif role == "system":
-                            langchain_messages.append(SystemMessage(content=content))
-                    
-                    response = await self.hybrid_caller.call_with_tools(langchain_messages)
+
+                    # Add system message to chat history
+                    chat_history.insert(0, SystemMessage(content=self.get_system_prompt()))
+
+                    response = await self.hybrid_caller.call_with_tools(chat_history)
                     
                     # Log the complete response from hybrid caller
                     response_log = {
@@ -383,7 +371,12 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                     return
                     
                 except Exception as e:
-                    logger.error(f"Fallback function calling failed: {e}, falling back to regular agent")
+                    logger.error(f"Fallback function calling failed: {e}")
+                    yield {
+                        "type": "error",
+                        "error": f"Fallback function calling failed: {str(e)}",
+                        "timestamp": datetime.now().isoformat()
+                    }
             
             if hasattr(self.agent_executor, 'astream'):
                 # Stream with agent executor
@@ -670,11 +663,7 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
             self.current_model = new_model
             
             # Recreate the agent with the new model using the same prompt selection logic
-            if self.agent_type == "softcatala_catalan":
-                prompt = self._get_softcatala_catalan_prompt()
-            else:
-                # Default to Softcatalà English prompt (includes softcatala_english and any unknown types)
-                prompt = self._get_softcatala_english_prompt()
+            prompt = self.get_chat_prompt_template()
             
             if self.tools:
                 # Check if this is OpenRouter provider
@@ -690,7 +679,7 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                             tools=self.tools,
                             verbose=True,
                             handle_parsing_errors=True,
-                            max_iterations=3
+                            max_iterations=15
                         )
                         self.hybrid_caller = None
                     else:
@@ -709,7 +698,7 @@ Si un usuari pregunta com pot col·laborar amb Softcatalà, explica'li que la mi
                         tools=self.tools,
                         verbose=True,
                         handle_parsing_errors=True,
-                        max_iterations=3
+                        max_iterations=15
                     )
                     self.hybrid_caller = None
             else:
